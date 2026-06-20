@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Sky Race 2026 — Live Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    --bg:#0E1A14; --panel:#142319; --panel-2:#192B1E; --line:#27402F;
+    --text:#EAF2EC; --text-dim:#8FA999; --accent:#FF6A3D; --accent2:#378ADD;
+    --good:#6FCF97; --bad:#E8694A;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',Helvetica,Arial,sans-serif;padding:32px 40px 64px;}
+  h1{font-size:28px;margin:0 0 4px;}
+  .sub{color:var(--text-dim);font-size:13px;margin-bottom:24px;}
+  .status{font-size:13px;color:var(--text-dim);margin-bottom:20px;display:flex;align-items:center;gap:12px;}
+  button{background:var(--accent);color:#0E1A14;border:none;padding:8px 16px;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;}
+  button:hover{opacity:0.9;}
+  button.secondary{background:var(--panel-2);color:var(--text);border:1px solid var(--line);}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;}
+  .metric{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;}
+  .metric .label{font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin-bottom:6px;}
+  .metric .val{font-size:24px;font-weight:700;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin-bottom:20px;}
+  .panel h2{font-size:14px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin:0 0 16px;}
+  .target-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+  label{font-size:12.5px;color:var(--text-dim);display:block;margin-bottom:4px;}
+  input{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:6px;font-size:14px;}
+  .phase-target-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:right;font-size:11px;text-transform:uppercase;color:var(--text-dim);padding:0 0 8px;border-bottom:1px solid var(--line);}
+  th:first-child,td:first-child{text-align:left;}
+  td{padding:9px 0;border-bottom:1px solid var(--line);}
+  .chart-wrap{position:relative;height:280px;}
+  .save-row{display:flex;align-items:center;gap:10px;}
+  #saveStatus{font-size:12px;color:var(--good);}
+</style>
+</head>
+<body>
+
+<h1>The Sky Race 2026 — Live Dashboard</h1>
+<div class="sub">Live data from Google Sheets · Targets editable by anyone with this link</div>
+
+<div class="status">
+  <span id="statusLine">Loading…</span>
+  <button class="secondary" id="refreshBtn">Refresh</button>
+</div>
+
+<div class="metrics" id="metricGrid"></div>
+
+<div class="panel">
+  <h2>Targets</h2>
+  <div class="target-grid">
+    <div>
+      <label>Overall ticket target</label>
+      <input type="number" id="overallTarget" placeholder="e.g. 9000" />
+    </div>
+    <div>
+      <label>Event / sale close date</label>
+      <input type="date" id="eventDate" />
+    </div>
+  </div>
+  <label style="margin-bottom:8px;">Per-phase targets (optional)</label>
+  <div class="phase-target-grid" id="phaseTargetGrid"></div>
+  <div class="save-row">
+    <button id="saveTargets">Save targets</button>
+    <span id="saveStatus"></span>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Cumulative tickets vs target pace</h2>
+  <div class="chart-wrap"><canvas id="paceChart"></canvas></div>
+</div>
+
+<div class="panel">
+  <h2>Phase breakdown</h2>
+  <div id="phaseTable"></div>
+</div>
+
+<script>
+// ====== CONFIG: your Apps Script Web App URL ======
+const API_URL = "https://script.google.com/a/macros/freshevents.asia/s/AKfycbyV_0F2AfWEDTlaHAtkgGpxZilsVdyjzNXQp3QuscMMKjsaQIYHMHGbz_exnu9yeQsE/exec";
+// ====================================================
+
+let paceChartInstance = null;
+let rawRows = [];
+const phaseOrder = ["Save the date","Lead Gen","Pre-Sale","Loyalty","Super Early Bird","Early Bird","Regular","Waitlist"];
+
+function fmtNum(n){ return Math.round(n).toLocaleString(); }
+function fmtMoney(n){ return 'RM' + Math.round(n).toLocaleString(); }
+
+async function loadTargets(){
+  try{
+    const res = await fetch(API_URL + "?action=getTargets");
+    return await res.json();
+  }catch(e){
+    return {overall:null, eventDate:null, phases:{}};
+  }
+}
+
+async function saveTargetsToAPI(t){
+  try{
+    await fetch(API_URL, {
+      method:"POST",
+      body: JSON.stringify(t)
+    });
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+async function loadData(){
+  document.getElementById('statusLine').textContent = "Loading live data…";
+  try{
+    const res = await fetch(API_URL + "?action=data");
+    rawRows = await res.json();
+    document.getElementById('statusLine').textContent = "Live — " + rawRows.length + " records · updated " + new Date().toLocaleTimeString();
+  }catch(e){
+    document.getElementById('statusLine').textContent = "Could not load data. Check the API URL / deployment.";
+    rawRows = [];
+  }
+  render();
+}
+
+async function render(){
+  const targets = await loadTargets();
+  if(document.getElementById('overallTarget').value === "" && targets.overall) document.getElementById('overallTarget').value = targets.overall;
+  if(document.getElementById('eventDate').value === "" && targets.eventDate) document.getElementById('eventDate').value = targets.eventDate;
+
+  if(rawRows.length === 0) return;
+
+  const totalTickets = rawRows.reduce((a,r)=>a+(parseInt(r['Ticket Count'])||0),0);
+  const totalRevenue = rawRows.reduce((a,r)=>a+(parseFloat(r['Total Registration + Product Rev'])||0),0);
+
+  const overallTarget = parseFloat(document.getElementById('overallTarget').value) || null;
+  const pctToGoal = overallTarget ? (totalTickets/overallTarget*100) : null;
+
+  let runRateNeeded = null;
+  const eventDateVal = document.getElementById('eventDate').value;
+  if(eventDateVal && overallTarget){
+    const today = new Date();
+    const end = new Date(eventDateVal);
+    const daysLeft = Math.max(1, Math.ceil((end-today)/(1000*60*60*24)));
+    runRateNeeded = Math.max(0,(overallTarget-totalTickets))/daysLeft;
+  }
+
+  const metricGrid = document.getElementById('metricGrid');
+  function metricCard(label, val){
+    return '<div class="metric"><div class="label">'+label+'</div><div class="val">'+val+'</div></div>';
+  }
+  metricGrid.innerHTML =
+    metricCard("Total tickets sold", fmtNum(totalTickets)) +
+    metricCard("Total revenue", fmtMoney(totalRevenue)) +
+    metricCard("% to goal", pctToGoal!==null ? Math.round(pctToGoal)+"%" : "—") +
+    metricCard("Daily run rate needed", runRateNeeded!==null ? fmtNum(runRateNeeded)+"/day" : "—");
+
+  const phases = {};
+  rawRows.forEach(r=>{
+    const p = r['Phase'];
+    if(!p) return;
+    if(!phases[p]) phases[p] = {tickets:0, revenue:0};
+    phases[p].tickets += parseInt(r['Ticket Count'])||0;
+    phases[p].revenue += parseFloat(r['Total Registration + Product Rev'])||0;
+  });
+  const phaseNames = Object.keys(phases).sort((a,b)=>{
+    const ia = phaseOrder.indexOf(a), ib = phaseOrder.indexOf(b);
+    return (ia===-1?99:ia)-(ib===-1?99:ib);
+  });
+
+  const ptg = document.getElementById('phaseTargetGrid');
+  const existingVals = {};
+  ptg.querySelectorAll('input').forEach(inp=> existingVals[inp.dataset.phase] = inp.value);
+  ptg.innerHTML = "";
+  phaseNames.forEach(p=>{
+    const savedVal = existingVals[p] !== undefined ? existingVals[p] : (targets.phases && targets.phases[p] ? targets.phases[p] : "");
+    ptg.innerHTML += '<div><label>'+p+'</label><input type="number" min="0" data-phase="'+p+'" value="'+savedVal+'" /></div>';
+  });
+
+  let rowsHtml = '<table><thead><tr><th>Phase</th><th>Tickets</th><th>Target</th><th>Revenue</th></tr></thead><tbody>';
+  phaseNames.forEach(p=>{
+    const d = phases[p];
+    const tgt = targets.phases && targets.phases[p] ? parseFloat(targets.phases[p]) : null;
+    let tgtCell = "—";
+    if(tgt){
+      const pct = Math.round(d.tickets/tgt*100);
+      const color = pct>=100 ? 'var(--good)' : (pct>=70 ? 'var(--text)' : 'var(--bad)');
+      tgtCell = '<span style="color:'+color+'">'+fmtNum(tgt)+' ('+pct+'%)</span>';
+    }
+    rowsHtml += '<tr><td>'+p+'</td><td style="text-align:right">'+fmtNum(d.tickets)+'</td><td style="text-align:right">'+tgtCell+'</td><td style="text-align:right">'+fmtMoney(d.revenue)+'</td></tr>';
+  });
+  rowsHtml += '</tbody></table>';
+  document.getElementById('phaseTable').innerHTML = rowsHtml;
+
+  const datedRows = rawRows.map(r=>({date: new Date(r['Date cleaned (DD/MM/YYYY)']), tickets: parseInt(r['Ticket Count'])||0})).filter(r=>!isNaN(r.date));
+  datedRows.sort((a,b)=>a.date-b.date);
+  const startDate = datedRows.length ? datedRows[0].date : new Date();
+  const byDay = {};
+  datedRows.forEach(r=>{
+    const d = Math.round((r.date-startDate)/(1000*60*60*24));
+    byDay[d] = (byDay[d]||0) + r.tickets;
+  });
+  const maxDay = Math.max(...Object.keys(byDay).map(Number), 1);
+  let cum = 0;
+  const actualSeries = [];
+  for(let d=0; d<=maxDay; d++){
+    cum += (byDay[d]||0);
+    actualSeries.push(cum);
+  }
+
+  let targetSeries = null;
+  if(overallTarget && eventDateVal){
+    const end = new Date(eventDateVal);
+    const totalCampaignDays = Math.max(1, Math.round((end-startDate)/(1000*60*60*24)));
+    targetSeries = [];
+    for(let d=0; d<=maxDay; d++){
+      targetSeries.push(Math.min(overallTarget, overallTarget * d / totalCampaignDays));
+    }
+  }
+
+  const ctx = document.getElementById('paceChart');
+  if(paceChartInstance) paceChartInstance.destroy();
+  const labels = actualSeries.map((_,i)=>"Day "+i);
+  const datasets = [{
+    label: "Actual cumulative tickets", data: actualSeries,
+    borderColor: "#378ADD", backgroundColor:"transparent", borderWidth:2.5, pointRadius:0, tension:0.15
+  }];
+  if(targetSeries){
+    datasets.push({
+      label: "Target pace", data: targetSeries,
+      borderColor:"#FF6A3D", backgroundColor:"transparent", borderWidth:2, borderDash:[6,4], pointRadius:0, tension:0
+    });
+  }
+  paceChartInstance = new Chart(ctx, {
+    type:'line',
+    data:{labels, datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{legend:{display:true, labels:{color:"#EAF2EC"}}},
+      scales:{
+        x:{ticks:{maxTicksLimit:10, color:"#8FA999"}, grid:{display:false}},
+        y:{ticks:{color:"#8FA999"}, grid:{color:"rgba(143,169,153,0.15)"}}
+      }
+    }
+  });
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+document.getElementById('saveTargets').addEventListener('click', async ()=>{
+  const overall = document.getElementById('overallTarget').value;
+  const eventDate = document.getElementById('eventDate').value;
+  const phases = {};
+  document.querySelectorAll('#phaseTargetGrid input').forEach(inp=>{
+    if(inp.value) phases[inp.dataset.phase] = inp.value;
+  });
+  const ok = await saveTargetsToAPI({overall, eventDate, phases});
+  document.getElementById('saveStatus').textContent = ok ? "Saved ✓" : "Failed to save";
+  setTimeout(()=> document.getElementById('saveStatus').textContent = "", 2000);
+  render();
+});
+
+loadData();
+</script>
+</body>
+</html>
