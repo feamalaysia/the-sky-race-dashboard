@@ -549,16 +549,25 @@ function renderSRBody(brandKey){
   const avgPriceCmp = cmp && cmp.regTickets ? cmp.totalRev/cmp.regTickets : null;
 
   let runRateNeeded = null;
+  let totalTarget = 0;
+  let targetAchieved = false;
   if(showSettings && settings.eventDate){
     const phasesWithTarget = (settings.phases||[]).filter(p=>p.target);
-    const totalTarget = phasesWithTarget.reduce((a,p)=>a+(parseFloat(p.target)||0),0);
+    totalTarget = phasesWithTarget.reduce((a,p)=>a+(parseFloat(p.target)||0),0);
     if(totalTarget > 0){
       const today = new Date();
       const end = new Date(settings.eventDate);
       const daysLeft = Math.max(1, Math.ceil((end-today)/(1000*60*60*24)));
-      runRateNeeded = Math.max(0,(totalTarget-curr.regTickets))/daysLeft;
+      if(curr.totalTicketsRegUnreg >= totalTarget){
+        targetAchieved = true;
+        runRateNeeded = 0;
+      } else {
+        runRateNeeded = Math.max(0,(totalTarget-curr.totalTicketsRegUnreg))/daysLeft;
+      }
     }
   }
+
+  const pctToTarget = totalTarget > 0 ? Math.min(100, (curr.totalTicketsRegUnreg/totalTarget*100)) : null;
 
   const metricsEl = document.getElementById('metrics_'+brandKey);
   function card(label, val, cmpVal, fmt, noCompare){
@@ -572,14 +581,21 @@ function renderSRBody(brandKey){
     const up = val>=cmpVal;
     return `<div class="metric"><div class="label">${label}</div><div class="val">${fmt(val)}</div><div class="delta ${up?'up':'down'}">${up?'▲':'▼'} vs ${compareYear}: ${fmt(cmpVal)}${pctChange!==null?' ('+(pctChange>=0?'+':'')+pctChange.toFixed(1)+'%)':''}</div></div>`;
   }
+
+  const progressCard = pctToTarget!==null ? `<div class="metric"><div class="label">% to target (reg+unreg)</div><div class="val">${pctToTarget.toFixed(1)}%</div><div style="background:var(--panel-2);border-radius:4px;height:8px;margin-top:8px;overflow:hidden;"><div style="height:100%;width:${pctToTarget}%;background:${pctToTarget>=100?'var(--good)':'var(--accent2)'};border-radius:4px;transition:width 0.4s;"></div></div><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${fmtNum(curr.totalTicketsRegUnreg)} / ${fmtNum(totalTarget)}</div></div>` : '';
+
+  const runRateCard = showSettings ? `<div class="metric"><div class="label">Daily run rate needed (overall)</div><div class="val" style="color:${targetAchieved?'var(--good)':'var(--text)'}">${targetAchieved?'🎉 Target achieved!':runRateNeeded!==null?fmtNum(runRateNeeded)+'/day':'set phase targets'}</div></div>` : '';
+
   metricsEl.innerHTML =
     card('Tickets sold (reg+unreg)', curr.totalTicketsRegUnreg, cmp?cmp.totalTicketsRegUnreg:null, fmtNum) +
     card('Registered tickets', curr.regTickets, cmp?cmp.regTickets:null, fmtNum) +
     card('Unregistered (team gap)', curr.unreg, null, fmtNum, true) +
+    card('Total revenue', curr.totalRev, cmp?cmp.totalRev:null, fmtMoney) +
     card('Registration revenue', curr.regRev, cmp?cmp.regRev:null, fmtMoney) +
     card('Add-on revenue', curr.prodRev, cmp?cmp.prodRev:null, fmtMoney) +
     card('Avg ticket price', avgPriceCurr, avgPriceCmp, fmtMoney) +
-    (showSettings ? card('Daily run rate needed (overall)', runRateNeeded!==null?runRateNeeded:0, null, v=>runRateNeeded!==null?fmtNum(v)+'/day':'set phase targets', true) : '');
+    progressCard +
+    runRateCard;
 
   renderPhaseTable(brandKey, rows, year, compareYear);
   renderSubEventTable(brandKey, rows, year, compareYear, settings);
@@ -636,7 +652,7 @@ function renderPhaseTable(brandKey, rows, year, compareYear){
     const cd = cmpPhases ? cmpPhases[p] : null;
     const ticketsCell = fmtNum(d.tickets) + deltaCell(d.tickets, !!cd, cd?cd.tickets:null, fmtNum);
     const revCell = fmtMoney(d.revenue) + deltaCell(d.revenue, !!cd, cd?cd.revenue:null, fmtMoney);
-    html += `<tr><td>${p}</td><td style="text-align:right">${ticketsCell}</td><td style="text-align:right">${avgDaily.toFixed(1)}</td><td style="text-align:right">${revCell}</td></tr>`;
+    html += `<tr><td>${p}</td><td style="text-align:right">${ticketsCell}</td><td style="text-align:right">${Math.round(avgDaily)}</td><td style="text-align:right">${revCell}</td></tr>`;
   });
   html += '</tbody></table>';
   document.getElementById('phaseTable_'+brandKey).innerHTML = html;
