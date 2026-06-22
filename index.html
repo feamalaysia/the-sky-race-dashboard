@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fresh Events — Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.0.1/chartjs-plugin-annotation.min.js"></script>
 <style>
   :root{
     --bg:#0E1A14; --panel:#142319; --panel-2:#192B1E; --line:#27402F;
@@ -1199,6 +1200,59 @@ function chartOpts(){
     scales:{x:{ticks:{maxTicksLimit:10,color:'#8FA999'},grid:{display:false}}, y:{ticks:{color:'#8FA999'},grid:{color:'rgba(143,169,153,0.15)'}}}};
 }
 
+// Build phase annotation lines for chart
+// Returns Chart.js annotation plugin config array
+function buildPhaseAnnotations(rows, years, seriesList, settings){
+  const phases = (settings.phases||[]).filter(p=>p.name && p.start);
+  if(!phases.length) return [];
+
+  const annotations = [];
+  const yearColors = ['rgba(55,138,221,0.6)', 'rgba(74,102,87,0.6)']; // blue for viewing year, muted for compare
+
+  years.forEach((year, yi)=>{
+    const s = seriesList[yi];
+    if(!s || !s.start) return;
+    const startDate = s.start;
+
+    phases.forEach((phase, pi)=>{
+      const phaseStart = new Date(phase.start);
+      const dayOffset = Math.round((phaseStart - startDate)/(1000*60*60*24));
+      if(dayOffset < 0 || dayOffset > s.lastDayWithData + 90) return;
+
+      annotations.push({
+        type:'line',
+        xMin: dayOffset,
+        xMax: dayOffset,
+        borderColor: yearColors[yi],
+        borderWidth: 1.5,
+        borderDash: [4,3],
+        label:{
+          display: true,
+          content: yi===0 ? phase.name : `${phase.name} (${year})`,
+          position: yi===0 ? 'start' : '15%',
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          color: yi===0 ? '#378ADD' : '#8FA999',
+          font:{size:10},
+          padding:{x:4, y:2},
+          yAdjust: yi===0 ? 0 : 18
+        }
+      });
+    });
+  });
+  return annotations;
+}
+
+function chartOptsWithAnnotations(annotations){
+  return {
+    responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:false},
+      annotation: annotations.length ? {annotations} : undefined
+    },
+    scales:{x:{ticks:{maxTicksLimit:10,color:'#8FA999'},grid:{display:false}}, y:{ticks:{color:'#8FA999'},grid:{color:'rgba(143,169,153,0.15)'}}}
+  };
+}
+
 function destroyChart(id){
   if(chartInstances[id]){ chartInstances[id].destroy(); delete chartInstances[id]; }
 }
@@ -1218,9 +1272,11 @@ function renderCumChart(brandKey, rows, year, compareYear, cat){
     });
     return {label:String(years[i]), data, borderColor:PALETTE[i], backgroundColor:'transparent', borderWidth:2.5, pointRadius:0, tension:0.15, spanGaps:false};
   });
+  const settings = brandData[brandKey] ? brandData[brandKey].settings : {};
+  const annotations = buildPhaseAnnotations(rows, years, seriesList, settings);
   const id = 'cumChart_'+brandKey;
   destroyChart(id);
-  chartInstances[id] = new Chart(document.getElementById(id), {type:'line', data:{labels,datasets}, options:chartOpts()});
+  chartInstances[id] = new Chart(document.getElementById(id), {type:'line', data:{labels,datasets}, options:chartOptsWithAnnotations(annotations)});
 }
 
 function renderDailyDeltaChart(brandKey, rows, year, compareYear, cat){
@@ -1234,9 +1290,11 @@ function renderDailyDeltaChart(brandKey, rows, year, compareYear, cat){
     data: labels.map((_,d)=> d > s.lastDayWithData ? null : (s.byDay[d]||0)),
     borderColor:PALETTE[i], backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:0.2, spanGaps:false
   }));
+  const settings = brandData[brandKey] ? brandData[brandKey].settings : {};
+  const annotations = buildPhaseAnnotations(rows, years, seriesList, settings);
   const id = 'dailyDeltaChart_'+brandKey;
   destroyChart(id);
-  chartInstances[id] = new Chart(document.getElementById(id), {type:'line', data:{labels,datasets}, options:chartOpts()});
+  chartInstances[id] = new Chart(document.getElementById(id), {type:'line', data:{labels,datasets}, options:chartOptsWithAnnotations(annotations)});
 }
 
 function renderPaceChart(brandKey, rows, year, settings){
@@ -1278,7 +1336,7 @@ function renderPaceChart(brandKey, rows, year, settings){
     const dailyRate = parseFloat(phase.target)/phaseDays;
     for(let d=phase.startOffset; d<=phase.endOffset && d<=maxDay; d++){
       runningTarget += dailyRate;
-      target[d] = runningTarget;
+      target[d] = Math.round(runningTarget);
     }
   });
 
