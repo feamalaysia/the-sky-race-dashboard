@@ -306,11 +306,13 @@ function brandPageHTML(brandKey){
     <div class="sub">Live data from Google Sheets · settings editable by anyone with this link</div>
     <div class="status"><span id="statusLine_${brandKey}">Loading…</span><button class="secondary" onclick="loadAll()">Refresh</button></div>
 
-    <div class="panel-head" style="margin-bottom:14px;">
-      <div class="filter-row">
-        <label style="margin:0;">Viewing year</label><select id="yearFilter_${brandKey}"></select>
-        <label style="margin:0 0 0 12px;">Compare vs</label><select id="compareYearFilter_${brandKey}"></select>
-        <label style="margin:0 0 0 12px;">Country</label><select id="countryFilter_${brandKey}"></select>
+    <div style="margin-bottom:14px;">
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
+        <label style="margin:0; font-size:12px; color:var(--text-dim);">Viewing year</label><select id="yearFilter_${brandKey}"></select>
+        <label style="margin:0 0 0 8px; font-size:12px; color:var(--text-dim);">Compare vs</label><select id="compareYearFilter_${brandKey}"></select>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <label style="margin:0; font-size:12px; color:var(--text-dim);">Country</label><select id="countryFilter_${brandKey}"></select>
       </div>
     </div>
 
