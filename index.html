@@ -196,31 +196,37 @@ function goPage(p){
     const el = document.getElementById(id);
     if(el) el.classList.toggle('active', id.toLowerCase().includes(p==='overview'?'overview':p));
   });
+  // lazy render brand page on first visit
+  if(p!=='overview' && brandData[p] && !pageInitialized[p]){
+    renderBrandPage(p);
+  }
 }
 
 async function fetchJSON(url, opts){ const res = await fetch(url, opts); return await res.json(); }
 
 async function loadAll(){
   document.getElementById('statusLineOverview').textContent = "Loading live data…";
-  for(const key of Object.keys(BRANDS)){
+  
+  const brandKeys = Object.keys(BRANDS);
+  await Promise.all(brandKeys.map(async key=>{
     const brand = BRANDS[key];
     let rows = [], settings = {eventDate:null, year:null, phases:[]};
-    try{
-      rows = await fetchJSON(brand.apiUrl + "?action=data");
-    }catch(e){ rows = []; }
+    try{ rows = await fetchJSON(brand.apiUrl + "?action=data"); }catch(e){ rows = []; }
     try{
       const s = await fetchJSON(brand.apiUrl + "?action=getSettings");
       if(s && s.phases!==undefined) settings = s;
     }catch(e){}
     brandData[key] = {rows, settings};
-  }
+  }));
+
   const totalRows = Object.values(brandData).reduce((a,b)=>a+b.rows.length,0);
   document.getElementById('statusLineOverview').textContent = "Live — " + totalRows + " total records · updated " + new Date().toLocaleTimeString();
 
   renderOverview();
-  renderBrandPage('tsr');
-  renderBrandPage('rl');
-  renderBrandPage('tmr');
+  // lazy render — brand pages only render when visited
+  if(pageInitialized['tsr']) renderBrandPage('tsr');
+  if(pageInitialized['rl']) renderBrandPage('rl');
+  if(pageInitialized['tmr']) renderBrandPage('tmr');
 }
 
 /* =================== SHARED CALC HELPERS =================== */
