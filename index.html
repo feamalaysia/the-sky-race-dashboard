@@ -413,6 +413,7 @@ function brandPageHTML(brandKey){
         <div class="filter-row"><label style="margin:0;">Category</label><select id="catFilter2_${brandKey}">${categoryOptions(brandKey)}</select></div>
       </div>
       <div class="legend-row" id="legendDaily2_${brandKey}"></div>
+      <div id="phaseLabels_${brandKey}" style="position:relative; height:20px; margin-bottom:4px; font-size:10px; overflow:hidden;"></div>
       <div class="chart-wrap"><canvas id="dailyDeltaChart_${brandKey}"></canvas></div>
     </div>
 
@@ -1200,25 +1201,32 @@ function chartOpts(){
     scales:{x:{ticks:{maxTicksLimit:10,color:'#8FA999'},grid:{display:false}}, y:{ticks:{color:'#8FA999'},grid:{color:'rgba(143,169,153,0.15)'}}}};
 }
 
-// Build phase annotation lines for chart
-// Returns Chart.js annotation plugin config array
-function buildPhaseAnnotations(rows, years, seriesList, settings){
-  const phases = (settings.phases||[]).filter(p=>p.name && p.start);
-  if(!phases.length) return [];
+// Auto-detect phase boundaries from raw data Phase column
+function getPhaseOffsets(rows, year, startDate){
+  const yr = rows.filter(r=>getEventYear(r)===String(year));
+  const phaseFirstDate = {};
+  yr.forEach(r=>{
+    const phase = r['Phase']; if(!phase) return;
+    const d = new Date(r['Date cleaned (DD/MM/YYYY)']);
+    if(isNaN(d)) return;
+    if(!phaseFirstDate[phase] || d < phaseFirstDate[phase]) phaseFirstDate[phase] = d;
+  });
+  return Object.entries(phaseFirstDate)
+    .map(([name, date])=>({name, dayOffset: Math.round((date-startDate)/(1000*60*60*24))}))
+    .filter(p=>p.dayOffset >= 0)
+    .sort((a,b)=>a.dayOffset-b.dayOffset);
+}
 
+function buildPhaseAnnotations(rows, years, seriesList){
   const annotations = [];
-  const yearColors = ['rgba(55,138,221,0.6)', 'rgba(74,102,87,0.6)']; // blue for viewing year, muted for compare
+  const yearColors = ['rgba(55,138,221,0.5)', 'rgba(74,102,87,0.5)'];
 
   years.forEach((year, yi)=>{
     const s = seriesList[yi];
     if(!s || !s.start) return;
-    const startDate = s.start;
-
-    phases.forEach((phase, pi)=>{
-      const phaseStart = new Date(phase.start);
-      const dayOffset = Math.round((phaseStart - startDate)/(1000*60*60*24));
-      if(dayOffset < 0 || dayOffset > s.lastDayWithData + 90) return;
-
+    const phases = getPhaseOffsets(rows, year, s.start);
+    phases.forEach(({dayOffset})=>{
+      if(dayOffset > s.lastDayWithData + 5) return;
       annotations.push({
         type:'line',
         xMin: dayOffset,
@@ -1226,20 +1234,32 @@ function buildPhaseAnnotations(rows, years, seriesList, settings){
         borderColor: yearColors[yi],
         borderWidth: 1.5,
         borderDash: [4,3],
-        label:{
-          display: true,
-          content: yi===0 ? phase.name : `${phase.name} (${year})`,
-          position: yi===0 ? 'start' : '15%',
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          color: yi===0 ? '#378ADD' : '#8FA999',
-          font:{size:10},
-          padding:{x:4, y:2},
-          yAdjust: yi===0 ? 0 : 18
-        }
+        label:{display:false}
       });
     });
   });
   return annotations;
+}
+
+function renderPhaseLabelsRow(brandKey, rows, years, seriesList, maxDay){
+  const container = document.getElementById('phaseLabels_'+brandKey);
+  if(!container) return;
+  const labelColors = ['#378ADD','#8FA999'];
+  let html = '';
+
+  years.forEach((year, yi)=>{
+    const s = seriesList[yi];
+    if(!s || !s.start) return;
+    const phases = getPhaseOffsets(rows, year, s.start);
+    phases.forEach(({name, dayOffset})=>{
+      if(dayOffset > maxDay + 5) return;
+      const pct = maxDay > 0 ? (dayOffset / maxDay * 100) : 0;
+      // offset second year labels slightly to avoid overlap
+      const topOffset = yi === 0 ? 0 : 10;
+      html += `<span style="position:absolute; left:${Math.min(pct,95)}%; transform:translateX(-50%); color:${labelColors[yi]}; font-weight:600; white-space:nowrap; top:${topOffset}px; font-size:9px;">${name}</span>`;
+    });
+  });
+  container.innerHTML = html;
 }
 
 function chartOptsWithAnnotations(annotations){
@@ -1272,11 +1292,9 @@ function renderCumChart(brandKey, rows, year, compareYear, cat){
     });
     return {label:String(years[i]), data, borderColor:PALETTE[i], backgroundColor:'transparent', borderWidth:2.5, pointRadius:0, tension:0.15, spanGaps:false};
   });
-  const settings = brandData[brandKey] ? brandData[brandKey].settings : {};
-  const annotations = buildPhaseAnnotations(rows, years, seriesList, settings);
   const id = 'cumChart_'+brandKey;
   destroyChart(id);
-  chartInstances[id] = new Chart(document.getElementById(id), {type:'line', data:{labels,datasets}, options:chartOptsWithAnnotations(annotations)});
+  chartInstances[id] = new Chart(document.getElementById(id), {type:'line', data:{labels,datasets}, options:chartOpts()});
 }
 
 function renderDailyDeltaChart(brandKey, rows, year, compareYear, cat){
@@ -1290,8 +1308,8 @@ function renderDailyDeltaChart(brandKey, rows, year, compareYear, cat){
     data: labels.map((_,d)=> d > s.lastDayWithData ? null : (s.byDay[d]||0)),
     borderColor:PALETTE[i], backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:0.2, spanGaps:false
   }));
-  const settings = brandData[brandKey] ? brandData[brandKey].settings : {};
-  const annotations = buildPhaseAnnotations(rows, years, seriesList, settings);
+  const annotations = buildPhaseAnnotations(rows, years, seriesList);
+  renderPhaseLabelsRow(brandKey, rows, years, seriesList, maxDay);
   const id = 'dailyDeltaChart_'+brandKey;
   destroyChart(id);
   chartInstances[id] = new Chart(document.getElementById(id), {type:'line', data:{labels,datasets}, options:chartOptsWithAnnotations(annotations)});
