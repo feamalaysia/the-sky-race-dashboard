@@ -124,12 +124,14 @@
       <button class="nav-btn active" id="navOverview" onclick="goPage('overview')">Overview</button>
       <button class="nav-btn" id="navTSR" onclick="goPage('tsr')">The Sky Race</button>
       <button class="nav-btn" id="navRL" onclick="goPage('rl')">REDLINE</button>
+      <button class="nav-btn" id="navTMR" onclick="goPage('tmr')">The Music Run</button>
     </div>
     <button class="hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">☰</button>
     <div class="nav-mobile-menu" id="mobileMenu">
       <button class="nav-btn active" id="navOverviewM" onclick="goPage('overview');toggleMobileMenu()">Overview</button>
       <button class="nav-btn" id="navTSRM" onclick="goPage('tsr');toggleMobileMenu()">The Sky Race</button>
       <button class="nav-btn" id="navRLM" onclick="goPage('rl');toggleMobileMenu()">REDLINE</button>
+      <button class="nav-btn" id="navTMRM" onclick="goPage('tmr');toggleMobileMenu()">The Music Run</button>
     </div>
   </div>
 
@@ -145,6 +147,7 @@
   <!-- ===================== TEMPLATE: rendered for both TSR and RL ===================== -->
   <div id="page-tsr" style="display:none;"></div>
   <div id="page-rl" style="display:none;"></div>
+  <div id="page-tmr" style="display:none;"></div>
 
 </div>
 
@@ -160,6 +163,11 @@ const BRANDS = {
     key:'rl', label:'REDLINE', eventNameMatch:'redline',
     apiUrl: "https://script.google.com/macros/s/AKfycbzL0dPJSh_ZQVl3hrYv5XhVigWnsfKog86Nbj3c83m0O4EbH4nJRAVBOSU1pq55LjXWwg/exec",
     schema:'rl'
+  },
+  tmr: {
+    key:'tmr', label:'The Music Run', eventNameMatch:'music run',
+    apiUrl: "https://script.google.com/macros/s/AKfycbzD1znvnMzpqvKM9zPZPoStVE0xb9vEhhmHojp8xdn3B1wNLninkGQgwIxLwLaz3CNvHg/exec",
+    schema:'tmr'
   }
 };
 const phaseOrder = ["Save the Date","Save the date","Lead Gen","Pre-Sale","Loyalty","Super Early Bird","Early Bird","Regular","Waitlist"];
@@ -177,16 +185,16 @@ function toggleMobileMenu(){
 }
 
 function goPage(p){
-  document.getElementById('page-overview').style.display = p==='overview' ? '' : 'none';
-  document.getElementById('page-tsr').style.display = p==='tsr' ? '' : 'none';
-  document.getElementById('page-rl').style.display = p==='rl' ? '' : 'none';
-  ['navOverview','navTSR','navRL'].forEach(id=>{
-    const el = document.getElementById(id);
-    if(el) el.classList.toggle('active', id.toLowerCase().includes(p==='overview'?'overview':p==='tsr'?'tsr':'rl'));
+  ['overview','tsr','rl','tmr'].forEach(page=>{
+    document.getElementById('page-'+page).style.display = p===page ? '' : 'none';
   });
-  ['navOverviewM','navTSRM','navRLM'].forEach(id=>{
+  ['navOverview','navTSR','navRL','navTMR'].forEach(id=>{
     const el = document.getElementById(id);
-    if(el) el.classList.toggle('active', id.toLowerCase().includes(p==='overview'?'overview':p==='tsr'?'tsr':'rl'));
+    if(el) el.classList.toggle('active', id.toLowerCase().includes(p==='overview'?'overview':p));
+  });
+  ['navOverviewM','navTSRM','navRLM','navTMRM'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.classList.toggle('active', id.toLowerCase().includes(p==='overview'?'overview':p));
   });
 }
 
@@ -225,8 +233,7 @@ function computeBrandYearMetrics(rows, year, brandKey, settings){
 
   let unreg = 0;
   const isOne = v => v===1 || v==='1' || v===true || Number(v)===1;
-  if(brandKey === 'tsr'){
-    const mpt = settings && settings.membersPerTeam ? parseInt(settings.membersPerTeam) : 2;
+  if(brandKey === 'tsr'){    const mpt = settings && settings.membersPerTeam ? parseInt(settings.membersPerTeam) : 2;
     const teamRows = yr.filter(r => r['Category']==='Team');
     const teamsFormed = teamRows.filter(r => isOne(r['Team Captain'])).length;
     const registeredTeamMembers = teamRows.filter(r => isOne(r['Team Member'])).length;
@@ -288,7 +295,7 @@ function renderOverview(){
   const brandList = [
     {key:'tsr', label:'The Sky Race'},
     {key:'rl', label:'REDLINE'},
-    {key:'music', label:'The Music Run'},
+    {key:'tmr', label:'The Music Run'},
     {key:'dua', label:'DUA'}
   ];
 
@@ -330,7 +337,7 @@ document.getElementById('countryFilterOverview').addEventListener('change', rend
 
 function brandPageHTML(brandKey){
   const label = BRANDS[brandKey].label;
-  const logoFile = brandKey==='tsr' ? 'images/TRS_LOGO_TM.png' : 'images/RL_Horizontal%20Stack_Colour%20with%20White%20Text.png';
+  const logoFile = brandKey==='tsr' ? 'images/TRS_LOGO_TM.png' : brandKey==='rl' ? 'images/RL_Horizontal%20Stack_Colour%20with%20White%20Text.png' : 'images/TMR%20logo.png';
   return `
     <img src="${logoFile}" alt="${label}" class="brand-logo" style="margin-top:24px;">
     <div class="sub">Live data from Google Sheets · settings editable by anyone with this link</div>
@@ -353,8 +360,7 @@ function brandPageHTML(brandKey){
           <div><label>Settings apply to year</label><input type="number" id="settingsYear_${brandKey}" placeholder="e.g. 2026" /></div>
           <div><label>Sale end date / event day</label><input type="date" id="eventDate_${brandKey}" /></div>
           ${brandKey==='tsr' ? `<div><label>Additional members needed per team</label><input type="number" id="membersPerTeam_${brandKey}" placeholder="e.g. 2" /></div>` : ''}
-          ${brandKey==='rl' ? `<div><label>Additional members needed (Doubles)</label><input type="number" id="doublesMembers_${brandKey}" placeholder="e.g. 1" /></div><div><label>Additional members needed (Team Relay)</label><input type="number" id="teamRelayMembers_${brandKey}" placeholder="e.g. 3" /></div>` : ''}
-        </div>
+          ${brandKey==='rl' ? `<div><label>Additional members needed (Doubles)</label><input type="number" id="doublesMembers_${brandKey}" placeholder="e.g. 1" /></div><div><label>Additional members needed (Team Relay)</label><input type="number" id="teamRelayMembers_${brandKey}" placeholder="e.g. 3" /></div>` : ''}        </div>
         <label style="margin-top:6px;">Phase definitions — name, date range, and ticket target (all required for run-rate calc)</label>
         <div class="req-note">Each phase needs a ticket target to calculate its own daily required rate.</div>
         <div id="phaseDefRows_${brandKey}"></div>
@@ -432,7 +438,7 @@ function brandPageHTML(brandKey){
 function categoryOptions(brandKey){
   if(brandKey==='tsr') return '<option value="all">All</option><option value="Individual">Individual</option><option value="Team">Team</option>';
   if(brandKey==='rl') return '<option value="all">All</option><option value="Singles">Singles</option><option value="Doubles">Doubles</option><option value="Team Relay">Team Relay</option>';
-  return '<option value="all">All</option>';
+  return '<option value="all">All</option><option value="Individual">Individual</option>';
 }
 
 function initBrandPage(brandKey){
@@ -450,7 +456,7 @@ function initBrandPage(brandKey){
   });
 }
 
-let pageInitialized = {tsr:false, rl:false};
+let pageInitialized = {tsr:false, rl:false, tmr:false};
 
 function renderBrandPage(brandKey){
   if(!pageInitialized[brandKey]){
