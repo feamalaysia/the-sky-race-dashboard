@@ -206,8 +206,8 @@ function goPage(p){
     const el = document.getElementById(id);
     if(el) el.classList.toggle('active', id.toLowerCase().includes(p==='overview'?'overview':p));
   });
-  // lazy render brand page on first visit
-  if(p!=='overview' && brandData[p] && !pageInitialized[p]){
+  // render brand page on tab click - always re-render if data available
+  if(p!=='overview' && brandData[p]){
     renderBrandPage(p);
   }
 }
@@ -233,7 +233,7 @@ async function loadAll(){
   document.getElementById('statusLineOverview').textContent = "Live — " + totalRows + " total records · updated " + new Date().toLocaleTimeString();
 
   renderOverview();
-  // lazy render — brand pages only render when visited
+  // after data loads, re-render any already-visited brand pages with fresh data
   if(pageInitialized['tsr']) renderBrandPage('tsr');
   if(pageInitialized['rl']) renderBrandPage('rl');
   if(pageInitialized['tmr']) renderBrandPage('tmr');
