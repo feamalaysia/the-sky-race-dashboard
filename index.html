@@ -438,7 +438,6 @@ function brandPageHTML(brandKey){
         <div class="filter-row"><label style="margin:0;">Category</label><select id="catFilter2_${brandKey}">${categoryOptions(brandKey)}</select></div>
       </div>
       <div class="legend-row" id="legendDaily2_${brandKey}"></div>
-      <div id="phaseLabels_${brandKey}" style="position:relative; height:24px; margin-bottom:4px; font-size:10px; overflow:hidden; min-width:900px;"></div>
       <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
         <div style="min-width:900px;"><div class="chart-wrap"><canvas id="dailyDeltaChart_${brandKey}"></canvas></div></div>
       </div>
@@ -1293,7 +1292,7 @@ function renderCohortTable(brandKey, rows, country){
 
   let html = '<div class="table-scroll"><table><thead><tr><th>Cohort</th><th>Total that year</th><th>New (cohort)</th>';
   for(let off=1; off<=maxOffset; off++){
-    html += `<th>Year ${off+1}</th><th>%</th>`;
+    html += `<th>Year ${off+1}</th>`;
   }
   html += '</tr></thead><tbody>';
 
@@ -1311,7 +1310,7 @@ function renderCohortTable(brandKey, rows, country){
       }
       const retained = size > 0 ? cohortEmails.filter(e => emailsByYear[targetYear].has(e)).length : 0;
       const p = size ? (retained/size*100) : 0;
-      html += `<td style="text-align:right">${fmtNum(retained)}</td><td style="text-align:right">${p.toFixed(0)}%</td>`;
+      html += `<td style="text-align:right">${fmtNum(retained)} <span style="color:var(--text-dim); font-size:11px;">(${p.toFixed(0)}%)</span></td>`;
     }
     html += '</tr>';
   });
@@ -1363,13 +1362,14 @@ function getPhaseOffsets(rows, year, startDate){
 
 function buildPhaseAnnotations(rows, years, seriesList){
   const annotations = [];
-  const yearColors = ['rgba(55,138,221,0.5)', 'rgba(74,102,87,0.5)'];
+  const yearColors = ['rgba(55,138,221,0.6)', 'rgba(74,102,87,0.5)'];
+  const labelColors = ['#378ADD', '#8FA999'];
 
   years.forEach((year, yi)=>{
     const s = seriesList[yi];
     if(!s || !s.start) return;
     const phases = getPhaseOffsets(rows, year, s.start);
-    phases.forEach(({dayOffset})=>{
+    phases.forEach(({name, dayOffset})=>{
       if(dayOffset > s.lastDayWithData + 5) return;
       annotations.push({
         type:'line',
@@ -1378,7 +1378,17 @@ function buildPhaseAnnotations(rows, years, seriesList){
         borderColor: yearColors[yi],
         borderWidth: 1.5,
         borderDash: [4,3],
-        label:{display:false}
+        label:{
+          display: false,
+          content: `${name} (${year})`,
+          backgroundColor: 'rgba(14,26,20,0.9)',
+          color: labelColors[yi],
+          font:{size:10, weight:'600'},
+          padding:{x:6, y:3},
+          position: 'start'
+        },
+        enter({element}){ element.label.options.display = true; return true; },
+        leave({element}){ element.label.options.display = false; return true; }
       });
     });
   });
@@ -1461,7 +1471,6 @@ function renderDailyDeltaChart(brandKey, rows, year, compareYear, cat, country, 
     borderColor:PALETTE[i], backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:0.2, spanGaps:false
   }));
   const annotations = buildPhaseAnnotations(rows, years, seriesList);
-  renderPhaseLabelsRow(brandKey, rows, years, seriesList, maxDay);
   const id = 'dailyDeltaChart_'+brandKey;
   destroyChart(id);
   chartInstances[id] = new Chart(document.getElementById(id), {type:'line', data:{labels,datasets}, options:chartOptsWithAnnotations(annotations)});
