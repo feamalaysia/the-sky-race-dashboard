@@ -359,7 +359,7 @@ function renderOverview(){
         <h3 style="margin:0;">${b.label}</h3>
         <select id="${countryId}" onchange="renderOverview()" style="font-size:12px; padding:3px 6px;">${countryOpts}</select>
       </div>
-      <div class="yr">${latestYear}${prevYear?' vs '+prevYear:' (no prior year)'}</div>
+      <div class="yr">Event year ${latestYear}${prevYear?' vs '+prevYear:' (no prior year)'}</div>
       ${row('Tickets sold (reg+unreg)', curr.totalTicketsRegUnreg, prev?prev.totalTicketsRegUnreg:null, fmtNum)}
       ${row('Registered tickets', curr.regTickets, prev?prev.regTickets:null, fmtNum)}
       ${row('Total revenue', curr.totalRev, prev?prev.totalRev:null, fmtMoney)}
@@ -403,11 +403,10 @@ function brandPageHTML(brandKey){
       <div class="settings-body">
         <div class="target-grid">
           <div><label>Settings apply to year</label><input type="number" id="settingsYear_${brandKey}" placeholder="e.g. 2026" /></div>
-          <div><label>Sale end date / event day</label><input type="date" id="eventDate_${brandKey}" /></div>
           ${brandKey==='tsr' ? `<div><label>Additional members needed per team</label><input type="number" id="membersPerTeam_${brandKey}" placeholder="e.g. 2" /></div>` : ''}
           ${brandKey==='rl' ? `<div><label>Additional members needed (Doubles)</label><input type="number" id="doublesMembers_${brandKey}" placeholder="e.g. 1" /></div><div><label>Additional members needed (Team Relay)</label><input type="number" id="teamRelayMembers_${brandKey}" placeholder="e.g. 3" /></div>` : ''}        </div>
-        <label style="margin-top:6px;">Phase definitions — name, date range, and ticket target (all required for run-rate calc)</label>
-        <div class="req-note">Each phase needs a ticket target to calculate its own daily required rate.</div>
+        <label style="margin-top:6px;">Phase definitions — name, date range, and ticket target (all required for run-rate and campaign days calc)</label>
+        <div class="req-note">Each phase needs a ticket target. The last phase's end date is used as the event date.</div>
         <div id="phaseDefRows_${brandKey}"></div>
         <button class="secondary" type="button" onclick="addPhaseDefRow('${brandKey}','','','','')">+ Add phase</button>
         <div class="save-row">
@@ -422,8 +421,6 @@ function brandPageHTML(brandKey){
     <div class="panel"><h2>Phase performance</h2><div class="table-scroll" id="phaseTable_${brandKey}"></div></div>
 
     <div class="panel" ${brandKey==='tmr' ? 'style="display:none;"' : ''}><h2>Sub-event breakdown (Reg + Unreg)</h2><div class="table-scroll" id="subEventTable_${brandKey}"></div></div>
-
-    <div class="panel" ${brandKey==='tmr' ? 'style="display:none;"' : ''}><h2>Category by phase</h2><div class="table-scroll" id="catPhaseTable_${brandKey}"></div></div>
 
     <div class="panel" id="cohortPanel_${brandKey}"><h2>Cohort retention</h2><div id="cohortTable_${brandKey}"></div></div>
 
@@ -521,8 +518,6 @@ function renderBrandPage(brandKey){
   populateYearFilters(brandKey);
 
   const s = data.settings;
-  const evEl = document.getElementById('eventDate_'+brandKey);
-  if(evEl.value === "" && s.eventDate) evEl.value = s.eventDate;
   const yrEl = document.getElementById('settingsYear_'+brandKey);
   if(yrEl.value === "" && s.year) yrEl.value = s.year;
   if(brandKey==='tsr'){
@@ -618,15 +613,18 @@ function renderSRBody(brandKey){
   let totalTarget = 0;
   let targetAchieved = false;
   let saleEnded = false;
+  // get last phase end date from settings
+  const phasesWithEnd = (settings.phases||[]).filter(p=>p.end).sort((a,b)=>new Date(a.end)-new Date(b.end));
+  const lastPhaseEnd = phasesWithEnd.length ? new Date(phasesWithEnd[phasesWithEnd.length-1].end) : null;
+
   let shortBy = 0;
-  if(showSettings && settings.eventDate){
+  if(showSettings && lastPhaseEnd){
     const phasesWithTarget = (settings.phases||[]).filter(p=>p.target);
     totalTarget = phasesWithTarget.reduce((a,p)=>a+(parseFloat(p.target)||0),0);
     if(totalTarget > 0){
       const today = new Date();
-      const end = new Date(settings.eventDate);
-      saleEnded = today >= end;
-      const daysLeft = Math.ceil((end-today)/(1000*60*60*24));
+      saleEnded = today >= lastPhaseEnd;
+      const daysLeft = Math.ceil((lastPhaseEnd-today)/(1000*60*60*24));
       if(curr.totalTicketsRegUnreg >= totalTarget){
         targetAchieved = true;
         runRateNeeded = 0;
@@ -635,6 +633,27 @@ function renderSRBody(brandKey){
       } else {
         runRateNeeded = Math.max(0,(totalTarget-curr.totalTicketsRegUnreg))/Math.max(1,daysLeft);
       }
+    }
+  }
+
+  // total campaign days: first sale date → last phase end date (viewing year)
+  let totalCampaignDays = null;
+  if(showSettings && lastPhaseEnd && viewRows.length > 0){
+    const dates = viewRows.map(r=>new Date(r['Date cleaned (DD/MM/YYYY)'])).filter(d=>!isNaN(d));
+    if(dates.length){
+      const firstSaleDate = new Date(Math.min(...dates));
+      totalCampaignDays = Math.round((lastPhaseEnd - firstSaleDate)/(1000*60*60*24));
+    }
+  }
+
+  // compare year total days: first sale date → last available data date
+  let cmpCampaignDays = null;
+  if(compareYear && cmpRows && cmpRows.length > 0){
+    const cmpDates = cmpRows.map(r=>new Date(r['Date cleaned (DD/MM/YYYY)'])).filter(d=>!isNaN(d));
+    if(cmpDates.length){
+      const cmpFirst = new Date(Math.min(...cmpDates));
+      const cmpLast = new Date(Math.max(...cmpDates));
+      cmpCampaignDays = Math.round((cmpLast - cmpFirst)/(1000*60*60*24));
     }
   }
 
@@ -657,6 +676,8 @@ function renderSRBody(brandKey){
 
   const runRateCard = showSettings ? `<div class="metric"><div class="label">${saleEnded && !targetAchieved ? 'Final result' : 'Daily run rate needed (overall)'}</div><div class="val" style="color:${targetAchieved?'var(--good)':saleEnded?'var(--bad)':'var(--text)'}">${targetAchieved ? '🎉 Target achieved!' : saleEnded ? `Short by ${fmtNum(shortBy)}` : runRateNeeded!==null ? fmtNum(runRateNeeded)+'/day' : 'set phase targets'}</div></div>` : '';
 
+  const campaignDaysCard = showSettings && totalCampaignDays!==null ? `<div class="metric"><div class="label">Total campaign days (Day 0 → event date)</div><div class="val">${totalCampaignDays} days</div>${cmpCampaignDays!==null?`<div class="delta flat">${compareYear}: ${cmpCampaignDays} days (data range)</div>`:''}</div>` : '';
+
   metricsEl.innerHTML =
     card('Tickets sold (reg+unreg)', curr.totalTicketsRegUnreg, cmp?cmp.totalTicketsRegUnreg:null, fmtNum) +
     card('Registered tickets', curr.regTickets, cmp?cmp.regTickets:null, fmtNum) +
@@ -666,7 +687,8 @@ function renderSRBody(brandKey){
     card('Add-on revenue', curr.prodRev, cmp?cmp.prodRev:null, fmtMoney) +
     card('Avg ticket price', avgPriceCurr, avgPriceCmp, fmtMoney) +
     progressCard +
-    runRateCard;
+    runRateCard +
+    campaignDaysCard;
 
   renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear);
   renderSubEventTable(brandKey, viewRows, cmpRows, year, compareYear, settings);
@@ -1525,7 +1547,6 @@ function renderPaceChart(brandKey, rows, year, settings){
 
 async function saveSettingsFor(brandKey){
   const statusId = brandKey==='tsr' ? 'saveStatusTSR' : 'saveStatusRL';
-  const eventDate = document.getElementById('eventDate_'+brandKey).value;
   const year = document.getElementById('settingsYear_'+brandKey).value;
   const phases = [];
   let missingTarget = false;
@@ -1547,7 +1568,7 @@ async function saveSettingsFor(brandKey){
     return;
   }
 
-  let settings = {eventDate, year, phases};
+  let settings = {year, phases};
   if(brandKey==='tsr'){
     const el = document.getElementById('membersPerTeam_tsr');
     settings.membersPerTeam = el ? el.value || 2 : 2;
