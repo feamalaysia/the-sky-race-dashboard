@@ -788,47 +788,42 @@ function renderSRBody(brandKey){
     }
   }
 
-  const pctToTarget = totalTarget > 0 ? Math.min(100, (curr.totalTicketsRegUnreg/totalTarget*100)) : null;
-
-  const metricsEl = document.getElementById('metrics_'+brandKey);
-  function card(label, val, cmpVal, fmt, noCompare){
-    if(noCompare || !cmp){
-      return `<div class="metric"><div class="label">${label}</div><div class="val">${fmt(val)}</div></div>`;
+  try{
+    const pctToTarget = totalTarget > 0 ? Math.min(100, (curr.totalTicketsRegUnreg/totalTarget*100)) : null;
+    const metricsEl = document.getElementById('metrics_'+brandKey);
+    function card(label, val, cmpVal, fmt, noCompare){
+      if(noCompare || !cmp){
+        return `<div class="metric"><div class="label">${label}</div><div class="val">${fmt(val)}</div></div>`;
+      }
+      if(cmpVal===null || cmpVal===undefined){
+        return `<div class="metric"><div class="label">${label}</div><div class="val">${fmt(val)}</div><div class="delta" style="color:var(--text-dim)">no data ${compareYear}</div></div>`;
+      }
+      const pctChange = cmpVal!==0 ? ((val-cmpVal)/cmpVal*100) : null;
+      const up = val>=cmpVal;
+      return `<div class="metric"><div class="label">${label}</div><div class="val">${fmt(val)}</div><div class="delta ${up?'up':'down'}">${up?'▲':'▼'} vs ${compareYear}: ${fmt(cmpVal)}${pctChange!==null?' ('+(pctChange>=0?'+':'')+pctChange.toFixed(1)+'%)':''}</div></div>`;
     }
-    if(cmpVal===null || cmpVal===undefined){
-      return `<div class="metric"><div class="label">${label}</div><div class="val">${fmt(val)}</div><div class="delta" style="color:var(--text-dim)">no data ${compareYear}</div></div>`;
-    }
-    const pctChange = cmpVal!==0 ? ((val-cmpVal)/cmpVal*100) : null;
-    const up = val>=cmpVal;
-    return `<div class="metric"><div class="label">${label}</div><div class="val">${fmt(val)}</div><div class="delta ${up?'up':'down'}">${up?'▲':'▼'} vs ${compareYear}: ${fmt(cmpVal)}${pctChange!==null?' ('+(pctChange>=0?'+':'')+pctChange.toFixed(1)+'%)':''}</div></div>`;
-  }
+    const progressCard = pctToTarget!==null ? `<div class="metric"><div class="label">% to target (reg+unreg)</div><div class="val">${pctToTarget.toFixed(1)}%</div><div style="background:var(--panel-2);border-radius:4px;height:8px;margin-top:8px;overflow:hidden;"><div style="height:100%;width:${pctToTarget}%;background:${pctToTarget>=100?'var(--good)':'var(--accent2)'};border-radius:4px;transition:width 0.4s;"></div></div><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${fmtNum(curr.totalTicketsRegUnreg)} / ${fmtNum(totalTarget)}</div></div>` : '';
+    const runRateCard = showSettings ? `<div class="metric"><div class="label">${saleEnded && !targetAchieved ? 'Final result' : 'Daily run rate needed (overall)'}</div><div class="val" style="color:${targetAchieved?'var(--good)':saleEnded?'var(--bad)':'var(--text)'}">${targetAchieved ? '🎉 Target achieved!' : saleEnded ? `Short by ${fmtNum(shortBy)}` : runRateNeeded!==null ? fmtNum(runRateNeeded)+'/day' : 'set phase targets'}</div></div>` : '';
+    const campaignDaysCard = showSettings && totalCampaignDays!==null ? `<div class="metric"><div class="label">Total campaign days (Day 0 → event date)</div><div class="val">${totalCampaignDays} days</div>${cmpCampaignDays!==null?`<div class="delta flat">${compareYear}: ${cmpCampaignDays} days (data range)</div>`:''}</div>` : '';
+    metricsEl.innerHTML =
+      card('Tickets sold (reg+unreg)', curr.totalTicketsRegUnreg, cmp?cmp.totalTicketsRegUnreg:null, fmtNum) +
+      card('Registered tickets', curr.regTickets, cmp?cmp.regTickets:null, fmtNum) +
+      card('Unregistered (team gap)', curr.unreg, null, fmtNum, true) +
+      card('Total revenue', curr.totalRev, cmp?cmp.totalRev:null, fmtMoney) +
+      card('Registration revenue', curr.regRev, cmp?cmp.regRev:null, fmtMoney) +
+      card('Add-on revenue', curr.prodRev, cmp?cmp.prodRev:null, fmtMoney) +
+      card('Avg ticket price', avgPriceCurr, avgPriceCmp, fmtMoney) +
+      progressCard + runRateCard + campaignDaysCard;
+  }catch(e){ console.error('metrics render',e.message, e.stack); }
 
-  const progressCard = pctToTarget!==null ? `<div class="metric"><div class="label">% to target (reg+unreg)</div><div class="val">${pctToTarget.toFixed(1)}%</div><div style="background:var(--panel-2);border-radius:4px;height:8px;margin-top:8px;overflow:hidden;"><div style="height:100%;width:${pctToTarget}%;background:${pctToTarget>=100?'var(--good)':'var(--accent2)'};border-radius:4px;transition:width 0.4s;"></div></div><div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${fmtNum(curr.totalTicketsRegUnreg)} / ${fmtNum(totalTarget)}</div></div>` : '';
-
-  const runRateCard = showSettings ? `<div class="metric"><div class="label">${saleEnded && !targetAchieved ? 'Final result' : 'Daily run rate needed (overall)'}</div><div class="val" style="color:${targetAchieved?'var(--good)':saleEnded?'var(--bad)':'var(--text)'}">${targetAchieved ? '🎉 Target achieved!' : saleEnded ? `Short by ${fmtNum(shortBy)}` : runRateNeeded!==null ? fmtNum(runRateNeeded)+'/day' : 'set phase targets'}</div></div>` : '';
-
-  const campaignDaysCard = showSettings && totalCampaignDays!==null ? `<div class="metric"><div class="label">Total campaign days (Day 0 → event date)</div><div class="val">${totalCampaignDays} days</div>${cmpCampaignDays!==null?`<div class="delta flat">${compareYear}: ${cmpCampaignDays} days (data range)</div>`:''}</div>` : '';
-
-  metricsEl.innerHTML =
-    card('Tickets sold (reg+unreg)', curr.totalTicketsRegUnreg, cmp?cmp.totalTicketsRegUnreg:null, fmtNum) +
-    card('Registered tickets', curr.regTickets, cmp?cmp.regTickets:null, fmtNum) +
-    card('Unregistered (team gap)', curr.unreg, null, fmtNum, true) +
-    card('Total revenue', curr.totalRev, cmp?cmp.totalRev:null, fmtMoney) +
-    card('Registration revenue', curr.regRev, cmp?cmp.regRev:null, fmtMoney) +
-    card('Add-on revenue', curr.prodRev, cmp?cmp.prodRev:null, fmtMoney) +
-    card('Avg ticket price', avgPriceCurr, avgPriceCmp, fmtMoney) +
-    progressCard +
-    runRateCard +
-    campaignDaysCard;
-
-  try{ renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear); }catch(e){ console.error('renderPhaseTable',e); }
-  try{ renderSubEventTable(brandKey, viewRows, cmpRows, year, compareYear, settings); }catch(e){ console.error('renderSubEventTable',e); }
-  try{ renderCatPhaseTable(brandKey, viewRows, year); }catch(e){ console.error('renderCatPhaseTable',e); }
-  try{ renderCohortTable(brandKey, rows, country); }catch(e){ console.error('renderCohortTable',e); }
-  try{ renderAudienceProfile(brandKey, viewRows, cmpRows, year, compareYear); }catch(e){ console.error('renderAudienceProfile',e); }
-  try{ renderCumChart(brandKey, rows, year, compareYear, document.getElementById('catFilter1_'+brandKey).value, country, compareCountry); }catch(e){ console.error('renderCumChart',e); }
-  try{ renderDailyDeltaChart(brandKey, rows, year, compareYear, document.getElementById('catFilter2_'+brandKey).value, country, compareCountry); }catch(e){ console.error('renderDailyDeltaChart',e); }
-  if(showSettings) try{ renderPaceChart(brandKey, viewRows, year, settings); }catch(e){ console.error('renderPaceChart',e); }
+  try{ renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear); }catch(e){ console.error('renderPhaseTable',e.message, e.stack); }
+  try{ renderSubEventTable(brandKey, viewRows, cmpRows, year, compareYear, settings); }catch(e){ console.error('renderSubEventTable',e.message, e.stack); }
+  try{ renderCatPhaseTable(brandKey, viewRows, year); }catch(e){ console.error('renderCatPhaseTable',e.message, e.stack); }
+  try{ renderCohortTable(brandKey, rows, country); }catch(e){ console.error('renderCohortTable',e.message, e.stack); }
+  try{ renderAudienceProfile(brandKey, viewRows, cmpRows, year, compareYear); }catch(e){ console.error('renderAudienceProfile',e.message, e.stack); }
+  try{ renderCumChart(brandKey, rows, year, compareYear, document.getElementById('catFilter1_'+brandKey).value, country, compareCountry); }catch(e){ console.error('renderCumChart',e.message, e.stack); }
+  try{ renderDailyDeltaChart(brandKey, rows, year, compareYear, document.getElementById('catFilter2_'+brandKey).value, country, compareCountry); }catch(e){ console.error('renderDailyDeltaChart',e.message, e.stack); }
+  if(showSettings) try{ renderPaceChart(brandKey, viewRows, year, settings); }catch(e){ console.error('renderPaceChart',e.message, e.stack); }
 }
 
 /* ---- Phase performance table ---- */
