@@ -585,10 +585,15 @@ function initBrandPage(brandKey){
   document.getElementById('catFilter1_'+brandKey).addEventListener('change', ()=>renderSRBody(brandKey));
   document.getElementById('catFilter2_'+brandKey).addEventListener('change', ()=>renderSRBody(brandKey));
   document.getElementById('audienceCatFilter_'+brandKey).addEventListener('change', ()=>{
-    const rows = srRowsFor(brandKey);
+    const allRows = srRowsFor(brandKey);
     const year = document.getElementById('yearFilter_'+brandKey).value;
     const compareYear = document.getElementById('compareYearFilter_'+brandKey).value;
-    renderAudienceProfile(brandKey, rows, year, compareYear);
+    const country = document.getElementById('countryFilter_'+brandKey).value;
+    const compareCountry = document.getElementById('compareCountryFilter_'+brandKey).value;
+    function filterRows(yr, ctry){ return allRows.filter(r=>getEventYear(r)===String(yr)&&(ctry==='all'||r['Country']===ctry)); }
+    const viewRows = filterRows(year, country);
+    const cmpRows = compareYear ? filterRows(compareYear, compareCountry) : null;
+    try{ renderAudienceProfile(brandKey, viewRows, cmpRows, year, compareYear); }catch(e){ console.error('renderAudienceProfile',e); }
   });
 }
 
@@ -778,14 +783,14 @@ function renderSRBody(brandKey){
     runRateCard +
     campaignDaysCard;
 
-  renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear);
-  renderSubEventTable(brandKey, viewRows, cmpRows, year, compareYear, settings);
-  renderCatPhaseTable(brandKey, viewRows, year);
-  renderCohortTable(brandKey, rows, country);
-  renderAudienceProfile(brandKey, viewRows, cmpRows, year, compareYear);
-  renderCumChart(brandKey, rows, year, compareYear, document.getElementById('catFilter1_'+brandKey).value, country, compareCountry);
-  renderDailyDeltaChart(brandKey, rows, year, compareYear, document.getElementById('catFilter2_'+brandKey).value, country, compareCountry);
-  if(showSettings) renderPaceChart(brandKey, viewRows, year, settings);
+  try{ renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear); }catch(e){ console.error('renderPhaseTable',e); }
+  try{ renderSubEventTable(brandKey, viewRows, cmpRows, year, compareYear, settings); }catch(e){ console.error('renderSubEventTable',e); }
+  try{ renderCatPhaseTable(brandKey, viewRows, year); }catch(e){ console.error('renderCatPhaseTable',e); }
+  try{ renderCohortTable(brandKey, rows, country); }catch(e){ console.error('renderCohortTable',e); }
+  try{ renderAudienceProfile(brandKey, viewRows, cmpRows, year, compareYear); }catch(e){ console.error('renderAudienceProfile',e); }
+  try{ renderCumChart(brandKey, rows, year, compareYear, document.getElementById('catFilter1_'+brandKey).value, country, compareCountry); }catch(e){ console.error('renderCumChart',e); }
+  try{ renderDailyDeltaChart(brandKey, rows, year, compareYear, document.getElementById('catFilter2_'+brandKey).value, country, compareCountry); }catch(e){ console.error('renderDailyDeltaChart',e); }
+  if(showSettings) try{ renderPaceChart(brandKey, viewRows, year, settings); }catch(e){ console.error('renderPaceChart',e); }
 }
 
 /* ---- Phase performance table ---- */
@@ -1374,6 +1379,7 @@ function renderAudienceProfile(brandKey, viewRows, cmpRows, year, compareYear){
   const stateVals = top10State.map(e=>e[1]);
   const stateTotal = stateVals.reduce((a,b)=>a+b,0);
   const sCtx = document.getElementById('stateChart_'+brandKey);
+  if(!sCtx) return;
   destroyChart('stateChart_'+brandKey);
 
   const stateDatasets = [{label:String(year), data:stateVals, backgroundColor:'#6FCF97', borderRadius:4}];
