@@ -533,7 +533,7 @@ function brandPageHTML(brandKey){
       <div class="panel-head">
         <h2 id="cumChartTitle_${brandKey}">Cumulative daily tickets — year comparison</h2>
         <div class="filter-row" style="gap:10px;">
-          <label style="margin:0;">Tickets</label><select id="ticketFilter1_${brandKey}"><option value="reg">Registered</option><option value="regunreg">Reg + Unreg</option></select>
+          <label style="margin:0;">Tickets</label><select id="ticketFilter1_${brandKey}"><option value="regunreg">Reg + Unreg</option><option value="reg">Registered</option></select>
           <label style="margin:0;">Category</label><select id="catFilter1_${brandKey}">${categoryOptions(brandKey)}</select>
         </div>
       </div>
@@ -545,7 +545,7 @@ function brandPageHTML(brandKey){
       <div class="panel-head">
         <h2 id="dailyChartTitle_${brandKey}">Daily additional tickets — year comparison</h2>
         <div class="filter-row" style="gap:10px;">
-          <label style="margin:0;">Tickets</label><select id="ticketFilter2_${brandKey}"><option value="reg">Registered</option><option value="regunreg">Reg + Unreg</option></select>
+          <label style="margin:0;">Tickets</label><select id="ticketFilter2_${brandKey}"><option value="regunreg">Reg + Unreg</option><option value="reg">Registered</option></select>
           <label style="margin:0;">Category</label><select id="catFilter2_${brandKey}">${categoryOptions(brandKey)}</select>
         </div>
       </div>
