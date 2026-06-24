@@ -509,7 +509,13 @@ function brandPageHTML(brandKey){
 
     <div class="metrics" id="metrics_${brandKey}"></div>
 
-    <div class="panel"><h2>Phase performance</h2><div class="table-scroll" id="phaseTable_${brandKey}"></div></div>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Phase performance</h2>
+        <div class="filter-row"><label style="margin:0;">Tickets</label><select id="phaseTicketFilter_${brandKey}"><option value="regunreg">Reg + Unreg</option><option value="reg">Registered</option></select></div>
+      </div>
+      <div class="table-scroll" id="phaseTable_${brandKey}"></div>
+    </div>
 
     <div class="panel" ${brandKey==='tmr' ? 'style="display:none;"' : ''}><h2>Sub-event breakdown (Reg + Unreg)</h2>
       <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:10px; max-width:480px;">
@@ -632,7 +638,7 @@ function initBrandPage(brandKey){
   document.getElementById('catFilter2_'+brandKey).addEventListener('change', ()=>renderSRBody(brandKey));
   document.getElementById('ticketFilter1_'+brandKey).addEventListener('change', ()=>renderSRBody(brandKey));
   document.getElementById('ticketFilter2_'+brandKey).addEventListener('change', ()=>renderSRBody(brandKey));
-  document.getElementById('catFilterRev_'+brandKey).addEventListener('change', ()=>renderSRBody(brandKey));
+  document.getElementById('phaseTicketFilter_'+brandKey).addEventListener('change', ()=>renderSRBody(brandKey));
   document.getElementById('subEventDateFrom_'+brandKey).addEventListener('change', ()=>renderSRBody(brandKey));
   document.getElementById('subEventDateTo_'+brandKey).addEventListener('change', ()=>renderSRBody(brandKey));
   function reRenderAudience(){
@@ -839,7 +845,7 @@ function renderSRBody(brandKey){
       progressCard + runRateCard + campaignDaysCard;
   }catch(e){ console.error('metrics render',e.message, e.stack); }
 
-  try{ renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear); }catch(e){ console.error('renderPhaseTable',e.message, e.stack); }
+  try{ renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear, settings, document.getElementById('phaseTicketFilter_'+brandKey).value); }catch(e){ console.error('renderPhaseTable',e.message, e.stack); }
   try{ renderSubEventTable(brandKey, viewRows, cmpRows, year, compareYear, settings); }catch(e){ console.error('renderSubEventTable',e.message, e.stack); }
   try{ renderCatPhaseTable(brandKey, viewRows, year); }catch(e){ console.error('renderCatPhaseTable',e.message, e.stack); }
   try{ renderCohortTable(brandKey, rows, country); }catch(e){ console.error('renderCohortTable',e.message, e.stack); }
@@ -852,13 +858,27 @@ function renderSRBody(brandKey){
 
 /* ---- Phase performance table ---- */
 
-function computePhaseBreakdown(rows, year){
-  const yr = rows; // rows are already filtered by year+country
+function computePhaseBreakdown(rows, year, brandKey, settings, ticketMode){
+  ticketMode = ticketMode || 'reg';
+  const isOne = v => v===1 || v==='1' || v===true || Number(v)===1;
+  const mpt = settings && settings.membersPerTeam ? parseInt(settings.membersPerTeam)+1 : 3;
+  const dm  = settings && settings.doublesMembers ? parseInt(settings.doublesMembers)+1 : 2;
+  const trm = settings && settings.teamRelayMembers ? parseInt(settings.teamRelayMembers)+1 : 4;
+
+  function ticketsForRow(r){
+    if(ticketMode !== 'regunreg') return parseInt(r['Ticket Count'])||0;
+    const cat = r['Category'];
+    if(brandKey==='tsr' && cat==='Team') return isOne(r['Team Captain']) ? mpt : 0;
+    if(brandKey==='rl' && cat==='Doubles') return isOne(r['Doubles Captain']) ? dm : 0;
+    if(brandKey==='rl' && cat==='Team Relay') return isOne(r['Team Relay Captain']) ? trm : 0;
+    return parseInt(r['Ticket Count'])||0;
+  }
+
   const phases = {};
-  yr.forEach(r=>{
+  rows.forEach(r=>{
     const p = r['Phase']; if(!p) return;
     if(!phases[p]) phases[p] = {tickets:0, revenue:0, days:new Set()};
-    phases[p].tickets += parseInt(r['Ticket Count'])||0;
+    phases[p].tickets += ticketsForRow(r);
     phases[p].revenue += parseFloat(r['Total Registration + Product Rev'])||0;
     const d = r['Date cleaned (DD/MM/YYYY)'];
     if(d) phases[p].days.add(String(d).slice(0,10));
@@ -866,9 +886,11 @@ function computePhaseBreakdown(rows, year){
   return phases;
 }
 
-function renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear){
-  const phases = computePhaseBreakdown(viewRows, year);
-  const cmpPhases = (compareYear && cmpRows) ? computePhaseBreakdown(cmpRows, compareYear) : null;
+function renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear, settings, ticketMode){
+  ticketMode = ticketMode || 'regunreg';
+  const colLabel = ticketMode==='regunreg' ? 'Total Reg+Unreg Tickets' : 'Total Reg Tickets';
+  const phases = computePhaseBreakdown(viewRows, year, brandKey, settings, ticketMode);
+  const cmpPhases = (compareYear && cmpRows) ? computePhaseBreakdown(cmpRows, compareYear, brandKey, settings, ticketMode) : null;
   const allNames = new Set(Object.keys(phases));
   if(cmpPhases) Object.keys(cmpPhases).forEach(n=>allNames.add(n));
   const names = [...allNames].sort((a,b)=>{
@@ -885,7 +907,7 @@ function renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear){
     return ' <span style="color:'+color+'; font-size:11.5px;">'+(up?'▲':'▼')+' '+fmt(prevVal)+(pctChange!==null?' ('+(pctChange>=0?'+':'')+pctChange.toFixed(0)+'%)':'')+'</span>';
   }
 
-  let html = '<table><thead><tr><th>Phase</th><th>Total Reg Tickets</th><th>Avg Daily Tickets</th><th>Total Revenue</th></tr></thead><tbody>';
+  let html = `<table><thead><tr><th>Phase</th><th>${colLabel}</th><th>Avg Daily Tickets</th><th>Total Revenue</th></tr></thead><tbody>`;
   names.forEach(p=>{
     const d = phases[p];
     if(!d){
