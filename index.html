@@ -907,18 +907,20 @@ function renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear, settin
     return ' <span style="color:'+color+'; font-size:11.5px;">'+(up?'▲':'▼')+' '+fmt(prevVal)+(pctChange!==null?' ('+(pctChange>=0?'+':'')+pctChange.toFixed(0)+'%)':'')+'</span>';
   }
 
-  let html = `<table><thead><tr><th>Phase</th><th>${colLabel}</th><th>Avg Daily Tickets</th><th>Total Revenue</th></tr></thead><tbody>`;
+  let html = `<div style="overflow-x:auto; -webkit-overflow-scrolling:touch;"><table style="min-width:520px;"><thead><tr><th>Phase</th><th style="text-align:right">% Split</th><th style="text-align:right">${colLabel}</th><th style="text-align:right">Avg Daily</th><th style="text-align:right">Total Revenue</th></tr></thead><tbody>`;
   names.forEach(p=>{
     const d = phases[p];
     if(!d){
-      html += `<tr><td>${p} <span style="color:var(--text-dim); font-size:11px;">(only in ${compareYear})</span></td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td></tr>`;
+      html += `<tr><td>${p} <span style="color:var(--text-dim); font-size:11px;">(only in ${compareYear})</span></td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td></tr>`;
       return;
     }
     const avgDaily = d.days.size ? d.tickets/d.days.size : d.tickets;
     const cd = cmpPhases ? cmpPhases[p] : null;
     const ticketsCell = fmtNum(d.tickets) + deltaCell(d.tickets, !!cd, cd?cd.tickets:null, fmtNum);
     const revCell = fmtMoney(d.revenue) + deltaCell(d.revenue, !!cd, cd?cd.revenue:null, fmtMoney);
-    html += `<tr><td>${p}</td><td style="text-align:right">${ticketsCell}</td><td style="text-align:right">${Math.round(avgDaily)}</td><td style="text-align:right">${revCell}</td></tr>`;
+    const grandTickets = Object.values(phases).reduce((a,d)=>a+d.tickets, 0);
+    const pct = grandTickets > 0 ? (d.tickets/grandTickets*100).toFixed(1)+'%' : '—';
+    html += `<tr><td>${p}</td><td style="text-align:right; color:var(--text-dim);">${pct}</td><td style="text-align:right">${ticketsCell}</td><td style="text-align:right">${Math.round(avgDaily)}</td><td style="text-align:right">${revCell}</td></tr>`;
   });
 
   // Grand total row for viewing year only
@@ -926,11 +928,12 @@ function renderPhaseTable(brandKey, viewRows, cmpRows, year, compareYear, settin
   const grandRev = Object.values(phases).reduce((a,d)=>a+d.revenue, 0);
   html += `<tr style="border-top:2px solid var(--line); font-weight:700;">
     <td>Grand Total</td>
+    <td style="text-align:right">100%</td>
     <td style="text-align:right">${fmtNum(grandTickets)}</td>
     <td style="text-align:right">—</td>
     <td style="text-align:right">${fmtMoney(grandRev)}</td>
   </tr>`;
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
   document.getElementById('phaseTable_'+brandKey).innerHTML = html;
 }
 
