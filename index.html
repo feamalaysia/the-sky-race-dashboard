@@ -955,14 +955,19 @@ function renderSubEventTable(brandKey, viewRows, cmpRows, year, compareYear, set
   function toYMD(d){
     if(!d) return null;
     const s = d.toString().trim();
+    // ISO timestamp (e.g. 2026-05-31T16:00:00.000Z) → convert to MYT date
+    if(s.includes('T') || s.endsWith('Z')){
+      const dt = new Date(s);
+      if(isNaN(dt)) return null;
+      // add UTC+8 offset
+      const mytMs = dt.getTime() + 8*60*60*1000;
+      return new Date(mytMs).toISOString().slice(0,10);
+    }
     // DD/MM/YYYY
     const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if(dmy) return `${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`;
     // YYYY-MM-DD
     if(s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0,10);
-    // MM/DD/YYYY
-    const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if(mdy) return `${mdy[3]}-${mdy[1].padStart(2,'0')}-${mdy[2].padStart(2,'0')}`;
     return null;
   }
   function applyDateFilter(rows){
@@ -1569,6 +1574,14 @@ function renderCohortTable(brandKey, rows, country){
 function parseMYT(dateStr){
   if(!dateStr) return new Date(NaN);
   const s = dateStr.toString().trim();
+  // ISO timestamp (e.g. 2026-05-31T16:00:00.000Z) → shift to MYT date midnight
+  if(s.includes('T') || s.endsWith('Z')){
+    const dt = new Date(s);
+    if(isNaN(dt)) return new Date(NaN);
+    const mytMs = dt.getTime() + 8*60*60*1000;
+    const mytDate = new Date(mytMs).toISOString().slice(0,10); // YYYY-MM-DD in MYT
+    return new Date(`${mytDate}T00:00:00+08:00`);
+  }
   // DD/MM/YYYY
   const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if(dmy) return new Date(`${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}T00:00:00+08:00`);
