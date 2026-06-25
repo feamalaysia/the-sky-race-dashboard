@@ -894,9 +894,11 @@ function renderSRBody(brandKey){
     const cmpRegInterest = cmpRegInterestKey && allSettings[cmpRegInterestKey] !== undefined ? allSettings[cmpRegInterestKey] : null;
     const cmpTotalDb = cmpDbKey && allSettings[cmpDbKey] !== undefined ? allSettings[cmpDbKey] : null;
 
-    const convCard = manualCard('Register Interest → Ticket Purchase', 'conv', convRate, cmpConvRate, compareYear, compareCountry, v=>v, '* Based on email unique IDs', '%');
-    const regInterestCard = manualCard('Total Register Interest', 'regInterest', regInterest, cmpRegInterest, compareYear, compareCountry, fmtNum, '* Subscriber unique emails', '');
-    const totalDbCard = manualCard('Total Database', 'totalDb', totalDb, cmpTotalDb, compareYear, compareCountry, fmtNum, '* Subscriber unique emails', '');
+    const showManualCards = parseInt(year) >= 2026;
+    const showManualCmp = parseInt(year) >= 2027;
+    const convCard = showManualCards ? manualCard('Register Interest → Ticket Purchase', 'conv', convRate, showManualCmp ? cmpConvRate : null, compareYear, compareCountry, v=>v, '* Based on email unique IDs', '%') : '';
+    const regInterestCard = showManualCards ? manualCard('Total Register Interest', 'regInterest', regInterest, showManualCmp ? cmpRegInterest : null, compareYear, compareCountry, fmtNum, '* Subscriber unique emails', '') : '';
+    const totalDbCard = showManualCards ? manualCard('Total Database', 'totalDb', totalDb, showManualCmp ? cmpTotalDb : null, compareYear, compareCountry, fmtNum, '* Subscriber unique emails', '') : '';
     metricsEl.innerHTML =
       card('Tickets sold (reg+unreg)', curr.totalTicketsRegUnreg, cmp?cmp.totalTicketsRegUnreg:null, fmtNum) +
       card('Registered tickets', curr.regTickets, cmp?cmp.regTickets:null, fmtNum) +
