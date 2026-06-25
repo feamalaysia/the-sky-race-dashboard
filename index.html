@@ -445,6 +445,24 @@ function renderEDMSection(brandKey, rows, year, compareYear, allRows){
   const deliveries = edm.map(r=>parseFloat(r['[EDM] Total Deliveries'])||0);
   const opens = edm.map(r=>(parseFloat(r['[EDM] Open rate'])||0)*100);
   const clicks = edm.map(r=>(parseFloat(r['[EDM] Click rate'])||0)*100);
+  // build index-based phase annotations for content charts
+  function buildContentPhaseAnnotations(dataRows){
+    const annotations = {};
+    let lastPhase = null;
+    dataRows.forEach((r,i)=>{
+      const phase = r['Phase']||'';
+      if(phase && phase !== lastPhase && i > 0){
+        annotations['phase_'+i] = {
+          type:'line', scaleID:'x', value:i-0.5,
+          borderColor:'rgba(255,106,61,0.5)', borderWidth:1, borderDash:[4,3],
+          label:{content:phase, display:true, position:'end', color:'#FF6A3D', font:{size:9}, backgroundColor:'rgba(14,26,20,0.8)', padding:3}
+        };
+      }
+      lastPhase = phase;
+    });
+    return annotations;
+  }
+
   const edmCtx = document.getElementById('edmChart_'+brandKey);
   destroyChart('edmChart_'+brandKey);
   chartInstances['edmChart_'+brandKey] = new Chart(edmCtx, {
@@ -455,6 +473,7 @@ function renderEDMSection(brandKey, rows, year, compareYear, allRows){
     ]},
     options:{responsive:true, maintainAspectRatio:false,
       plugins:{
+        annotation:{annotations: buildContentPhaseAnnotations(edm)},
         legend:{labels:{color:'#EAF2EC', font:{size:11}, boxWidth:12}},
         tooltip:{callbacks:{
           title: items => names[items[0].dataIndex] || shortNames[items[0].dataIndex],
@@ -543,7 +562,9 @@ function renderSocialSection(brandKey, rows, year, compareYear, allRows){
       {type:'line', label:'Interaction Rate %', data:igIR, borderColor:'#FF6A3D', backgroundColor:'transparent', borderWidth:2, pointRadius:3, yAxisID:'yIR', order:1, tension:0.2}
     ]},
     options:{responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{labels:{color:'#EAF2EC', font:{size:11}, boxWidth:12}},
+      plugins:{
+        annotation:{annotations: buildContentPhaseAnnotations(igData)},
+        legend:{labels:{color:'#EAF2EC', font:{size:11}, boxWidth:12}},
         tooltip:{callbacks:{
           title:items=>igNames[items[0].dataIndex]||igShort[items[0].dataIndex],
           label:ctx=>ctx.dataset.yAxisID==='yIR'?` IR: ${ctx.parsed.y.toFixed(1)}%`:` Views: ${fmtNum(ctx.parsed.y)}`
@@ -570,7 +591,9 @@ function renderSocialSection(brandKey, rows, year, compareYear, allRows){
       {type:'line', label:'Interaction Rate %', data:fbIR, borderColor:'#C77DFF', backgroundColor:'transparent', borderWidth:2, pointRadius:3, yAxisID:'yIR', order:1, tension:0.2}
     ]},
     options:{responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{labels:{color:'#EAF2EC', font:{size:11}, boxWidth:12}},
+      plugins:{
+        annotation:{annotations: buildContentPhaseAnnotations(fbData)},
+        legend:{labels:{color:'#EAF2EC', font:{size:11}, boxWidth:12}},
         tooltip:{callbacks:{
           title:items=>fbNames[items[0].dataIndex]||fbShort[items[0].dataIndex],
           label:ctx=>ctx.dataset.yAxisID==='yIR'?` IR: ${ctx.parsed.y.toFixed(1)}%`:` Views: ${fmtNum(ctx.parsed.y)}`
