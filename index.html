@@ -170,11 +170,13 @@ const BRANDS = {
   rl: {
     key:'rl', label:'REDLINE', eventNameMatch:'redline',
     apiUrl: "https://script.google.com/macros/s/AKfycbzL0dPJSh_ZQVl3hrYv5XhVigWnsfKog86Nbj3c83m0O4EbH4nJRAVBOSU1pq55LjXWwg/exec",
+    tsr2Url: "https://script.google.com/macros/s/AKfycby1PqLIIdXGtHFdUAo0UJVOyFsfFAJTpMB4DS0I2L_XJYdxhxQS6tsyC2GpQfgT1koj/exec",
     schema:'rl'
   },
   tmr: {
     key:'tmr', label:'The Music Run', eventNameMatch:'music run',
     apiUrl: "https://script.google.com/macros/s/AKfycbzD1znvnMzpqvKM9zPZPoStVE0xb9vEhhmHojp8xdn3B1wNLninkGQgwIxLwLaz3CNvHg/exec",
+    tsr2Url: "https://script.google.com/macros/s/AKfycbwib7NxOhZoJBQZukpX1owvrpHlRjDhzBUsXcOFf4iuRWscCQioVUc3evvGc6b8MfLK/exec",
     schema:'tmr'
   }
 };
@@ -264,7 +266,6 @@ function renderTSR2Sections(brandKey, year, compareYear, country){
 
   const yr2 = allRows.filter(r=>getTSR2Year(r)===String(year) && (country==='all'||r['Country']===country));
   const cmpYr2 = compareYear ? allRows.filter(r=>getTSR2Year(r)===String(compareYear) && (country==='all'||r['Country']===country)) : null;
-  const yr1 = tsr1Rows.filter(r=>getEventYear(r)===String(year) && (country==='all'||r['Country']===country));
   const allTsr1 = tsr1Rows.filter(r=>country==='all'||r['Country']===country);
 
   renderTrafficSection(brandKey, yr2, cmpYr2, allTsr1, year, compareYear);
@@ -435,9 +436,9 @@ function renderTrafficSection(brandKey, rows, cmpRows, tsr1Rows, year, compareYe
   console.log('[CR] 2026 non-null:', crData.filter(v=>v!==null).length);
   console.log('[CR] 2025 non-null:', cmpCrData ? cmpCrData.filter(v=>v!==null).length : 'N/A');
 
-  // trim x-axis to first day with CR data in EITHER year
-  const allCrData = crData.map((v,i)=>v ?? (cmpCrData?.[i] ?? null));
-  const firstCrDay = allCrData.findIndex(v=>v!==null);
+  // trim x-axis to first day with CR data in current year only
+  // (compare year may have data at different day offsets)
+  const firstCrDay = crData.findIndex(v=>v!==null);
   const trimFrom = firstCrDay > 0 ? firstCrDay : 0;
   const crLabels = labels.slice(trimFrom);
   const crDataTrimmed = crData.slice(trimFrom);
@@ -1144,7 +1145,7 @@ function brandPageHTML(brandKey){
       </div>
     </div>
 
-    ${brandKey === 'tsr' ? `
+    ${BRANDS[brandKey] && BRANDS[brandKey].tsr2Url ? `
     <div style="border-top:2px solid var(--line); margin:32px 0 0; padding-top:16px;">
       <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-dim); margin:0 0 4px;">Traffic</p>
       <p style="font-size:11px; color:var(--text-dim); margin:0 0 20px; font-style:italic;">* Day 0 = first day of awareness / save the date phase</p>
@@ -1519,7 +1520,7 @@ function renderSRBody(brandKey){
   try{ renderDailyDeltaChart(brandKey, rows, year, compareYear, document.getElementById('catFilter2_'+brandKey).value, country, compareCountry, document.getElementById('ticketFilter2_'+brandKey).value); }catch(e){ console.error('renderDailyDeltaChart',e.message, e.stack); }
   if(showSettings) try{ renderPaceChart(brandKey, viewRows, year, settings); }catch(e){ console.error('renderPaceChart',e.message, e.stack); }
   try{ renderRevChart(brandKey, rows, year, compareYear, document.getElementById('catFilterRev_'+brandKey).value, country, compareCountry); }catch(e){ console.error('renderRevChart',e.message, e.stack); }
-  if(brandKey==='tsr') try{ renderTSR2Sections(brandKey, year, compareYear, country); }catch(e){ console.error('renderTSR2',e.message, e.stack); }
+  if(brandData[brandKey] && brandData[brandKey].tsr2rows && brandData[brandKey].tsr2rows.length) try{ renderTSR2Sections(brandKey, year, compareYear, country); }catch(e){ console.error('renderTSR2',e.message, e.stack); }
 }
 
 /* ---- Phase performance table ---- */
