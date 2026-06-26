@@ -1149,8 +1149,10 @@ function brandPageHTML(brandKey){
     </div>
 
     ${BRANDS[brandKey] && BRANDS[brandKey].tsr2Url ? `
+    <div id="tsr2Sections_${brandKey}">
     <div style="border-top:2px solid var(--line); margin:32px 0 0; padding-top:16px;">
-      <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-dim); margin:0 0 4px;">Traffic</p>
+      <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-dim); margin:0 0 2px;">Traffic</p>
+      <p style="font-size:11px; color:var(--text-dim); margin:0 0 4px; font-style:italic;">Data available from 2025 onwards</p>
       <p style="font-size:11px; color:var(--text-dim); margin:0 0 20px; font-style:italic;">* Day 0 = first day of awareness / save the date phase</p>
     </div>
     <div class="metrics" id="trafficMetrics_${brandKey}"></div>
@@ -1170,7 +1172,8 @@ function brandPageHTML(brandKey){
     </div>
 
     <div style="border-top:2px solid var(--line); margin:32px 0 0; padding-top:16px;">
-      <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-dim); margin:0 0 20px;">EDM</p>
+      <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-dim); margin:0 0 2px;">EDM</p>
+      <p style="font-size:11px; color:var(--text-dim); margin:0 0 20px; font-style:italic;">Data available from 2025 onwards</p>
     </div>
     <div class="metrics" id="edmMetrics_${brandKey}"></div>
     <div class="panel">
@@ -1182,7 +1185,8 @@ function brandPageHTML(brandKey){
     <div class="panel" id="edmTop3_${brandKey}"></div>
 
     <div style="border-top:2px solid var(--line); margin:32px 0 0; padding-top:16px;">
-      <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-dim); margin:0 0 20px;">Social</p>
+      <p style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-dim); margin:0 0 2px;">Social</p>
+      <p style="font-size:11px; color:var(--text-dim); margin:0 0 20px; font-style:italic;">Data available from 2025 onwards</p>
     </div>
     <div class="metrics" id="socialMetrics_${brandKey}"></div>
     <div class="panel">
@@ -1200,6 +1204,7 @@ function brandPageHTML(brandKey){
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
       <div class="panel" style="margin-bottom:0;" id="igTop5_${brandKey}"></div>
       <div class="panel" style="margin-bottom:0;" id="fbTop5_${brandKey}"></div>
+    </div>
     </div>
     ` : ''}
   `;
@@ -1523,7 +1528,11 @@ function renderSRBody(brandKey){
   try{ renderDailyDeltaChart(brandKey, rows, year, compareYear, document.getElementById('catFilter2_'+brandKey).value, country, compareCountry, document.getElementById('ticketFilter2_'+brandKey).value); }catch(e){ console.error('renderDailyDeltaChart',e.message, e.stack); }
   if(showSettings) try{ renderPaceChart(brandKey, viewRows, year, settings); }catch(e){ console.error('renderPaceChart',e.message, e.stack); }
   try{ renderRevChart(brandKey, rows, year, compareYear, document.getElementById('catFilterRev_'+brandKey).value, country, compareCountry); }catch(e){ console.error('renderRevChart',e.message, e.stack); }
-  if(brandData[brandKey] && brandData[brandKey].tsr2rows && brandData[brandKey].tsr2rows.length) try{ renderTSR2Sections(brandKey, year, compareYear, country); }catch(e){ console.error('renderTSR2',e.message, e.stack); }
+  // show/hide TSR2 sections based on year
+  const tsr2El = document.getElementById('tsr2Sections_'+brandKey);
+  if(tsr2El) tsr2El.style.display = parseInt(year) >= 2025 ? '' : 'none';
+
+  if(brandData[brandKey] && brandData[brandKey].tsr2rows && brandData[brandKey].tsr2rows.length && parseInt(year) >= 2025) try{ renderTSR2Sections(brandKey, year, compareYear, country); }catch(e){ console.error('renderTSR2',e.message, e.stack); }
 }
 
 /* ---- Phase performance table ---- */
