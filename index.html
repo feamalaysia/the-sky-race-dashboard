@@ -265,8 +265,9 @@ function renderTSR2Sections(brandKey, year, compareYear, country){
   const yr2 = allRows.filter(r=>getTSR2Year(r)===String(year) && (country==='all'||r['Country']===country));
   const cmpYr2 = compareYear ? allRows.filter(r=>getTSR2Year(r)===String(compareYear) && (country==='all'||r['Country']===country)) : null;
   const yr1 = tsr1Rows.filter(r=>getEventYear(r)===String(year) && (country==='all'||r['Country']===country));
+  const allTsr1 = tsr1Rows.filter(r=>country==='all'||r['Country']===country);
 
-  renderTrafficSection(brandKey, yr2, cmpYr2, yr1, year, compareYear);
+  renderTrafficSection(brandKey, yr2, cmpYr2, allTsr1, year, compareYear);
   renderEDMSection(brandKey, yr2, year, compareYear, allRows);
   renderSocialSection(brandKey, yr2, year, compareYear, allRows);
 }
@@ -375,17 +376,16 @@ function renderTrafficSection(brandKey, rows, cmpRows, tsr1Rows, year, compareYe
   destroyChart('crChart_'+brandKey);
 
   const tsr1ByDate = {};
-  tsr1Rows.forEach(r=>{
+  tsr1Rows.filter(r=>getEventYear(r)===String(year)).forEach(r=>{
     const d = parseMYT(r['Date cleaned (DD/MM/YYYY)']);
     if(isNaN(d)) return;
     const key = new Date(d.getTime()+8*60*60*1000).toISOString().slice(0,10);
     tsr1ByDate[key] = (tsr1ByDate[key]||0) + (parseInt(r['Ticket Count'])||0);
   });
 
-  // also build cmpTSR1 if we have compare year
-  const cmpTsr1Rows = tsr1Rows.filter(r=>getEventYear(r)===String(compareYear));
+  // compare year TSR1
   const cmpTsr1ByDate = {};
-  cmpTsr1Rows.forEach(r=>{
+  tsr1Rows.filter(r=>getEventYear(r)===String(compareYear)).forEach(r=>{
     const d = parseMYT(r['Date cleaned (DD/MM/YYYY)']);
     if(isNaN(d)) return;
     const key = new Date(d.getTime()+8*60*60*1000).toISOString().slice(0,10);
@@ -633,15 +633,18 @@ function renderSocialSection(brandKey, rows, year, compareYear, allRows){
   const igIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="#E1306C" style="vertical-align:middle;margin-right:3px;flex-shrink:0;"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>`;
 
   const metricsEl = document.getElementById('socialMetrics_'+brandKey);
-  if(metricsEl) metricsEl.innerHTML =
-    // row 1: totals only
-    `<div class="metric"><div class="label">${fbIcon}${igIcon} Total Reach</div><div class="val">${fmtNum(fbReach+igReach)}</div>${deltaLine(fbReach+igReach,(cmpFbReach!==null&&cmpIgReach!==null)?cmpFbReach+cmpIgReach:null,fmtNum)}</div>` +
-    `<div class="metric"><div class="label">${fbIcon}${igIcon} Total Views</div><div class="val">${fmtNum(fbViews+igViews)}</div>${deltaLine(fbViews+igViews,(cmpFbViews!==null&&cmpIgViews!==null)?cmpFbViews+cmpIgViews:null,fmtNum)}</div>` +
+  if(metricsEl){
+    metricsEl.style.gridTemplateColumns = 'repeat(4, 1fr)';
+    metricsEl.innerHTML =
+    // row 1: totals only (span 2 each to fill 4-col grid)
+    `<div class="metric" style="grid-column:span 2"><div class="label">${fbIcon}${igIcon} Total Reach</div><div class="val">${fmtNum(fbReach+igReach)}</div>${deltaLine(fbReach+igReach,(cmpFbReach!==null&&cmpIgReach!==null)?cmpFbReach+cmpIgReach:null,fmtNum)}</div>` +
+    `<div class="metric" style="grid-column:span 2"><div class="label">${fbIcon}${igIcon} Total Views</div><div class="val">${fmtNum(fbViews+igViews)}</div>${deltaLine(fbViews+igViews,(cmpFbViews!==null&&cmpIgViews!==null)?cmpFbViews+cmpIgViews:null,fmtNum)}</div>` +
     // row 2: FB Reach (with IR), FB Views, IG Reach (with IR), IG Views
     `<div class="metric"><div class="label">${fbIcon} Reach</div><div class="val">${fmtNum(fbReach)}</div>${deltaLine(fbReach,cmpFbReach,fmtNum)}<div class="delta flat">Avg IR: ${(avgFBRate*100).toFixed(1)}%${cmpAvgFBRate!==null?' · '+compareYear+': '+(cmpAvgFBRate*100).toFixed(1)+'%':''}</div></div>` +
     `<div class="metric"><div class="label">${fbIcon} Views</div><div class="val">${fmtNum(fbViews)}</div>${deltaLine(fbViews,cmpFbViews,fmtNum)}</div>` +
     `<div class="metric"><div class="label">${igIcon} Reach</div><div class="val">${fmtNum(igReach)}</div>${deltaLine(igReach,cmpIgReach,fmtNum)}<div class="delta flat">Avg IR: ${(avgIGRate*100).toFixed(1)}%${cmpAvgIGRate!==null?' · '+compareYear+': '+(cmpAvgIGRate*100).toFixed(1)+'%':''}</div></div>` +
     `<div class="metric"><div class="label">${igIcon} Views</div><div class="val">${fmtNum(igViews)}</div>${deltaLine(igViews,cmpIgViews,fmtNum)}</div>`;
+  }
 
   // phase annotation helper - label only on hover, at top
   function buildContentPhaseAnnotations(dataRows){
