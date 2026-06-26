@@ -408,41 +408,32 @@ function renderTrafficSection(brandKey, rows, cmpRows, tsr1Rows, year, compareYe
     cmpTsr2ByDate[key] = (cmpTsr2ByDate[key]||0) + (parseFloat(r['Users'])||0);
   });
 
-  // build CR data keyed by calendar date (MYT YYYY-MM-DD), then map to 2026 day axis
-  const crByDate = {};
-  Object.keys(tsr2ByDate).forEach(dateKey=>{
-    const users = tsr2ByDate[dateKey]||0;
-    const tickets = tsr1ByDate[dateKey]||0;
-    if(users>0 && tickets>0) crByDate[dateKey] = parseFloat(((tickets/users)*100).toFixed(2));
-  });
-
-  const cmpCrByDate = {};
-  Object.keys(cmpTsr2ByDate).forEach(dateKey=>{
-    const users = cmpTsr2ByDate[dateKey]||0;
-    const tickets = cmpTsr1ByDate[dateKey]||0;
-    if(users>0 && tickets>0) cmpCrByDate[dateKey] = parseFloat(((tickets/users)*100).toFixed(2));
-  });
-
-  // build CR arrays aligned to each year's own day axis
+  // build CR arrays - each year uses its OWN TSR2 day axis
+  // crData uses s1.dayToDate (2026 TSR2 days), cmpCrData uses s2.dayToDate (2025 TSR2 days)
   const crData = labels.map((_,d)=>{
     if(d > s1.lastDayWithData) return null;
     const dt = s1.dayToDate[d];
     if(!dt) return null;
     const key = new Date(dt.getTime()+8*60*60*1000).toISOString().slice(0,10);
-    return crByDate[key] ?? null;
+    const users = tsr2ByDate[key]||0;
+    const tickets = tsr1ByDate[key]||0;
+    if(users===0 || tickets===0) return null;
+    return parseFloat(((tickets/users)*100).toFixed(2));
   });
 
   const cmpCrData = (s2 && compareYear) ? labels.map((_,d)=>{
     if(d > s2.lastDayWithData) return null;
-    const dt = s2.dayToDate[d];
+    const dt = s2.dayToDate[d];  // 2025 TSR2's own Day 0
     if(!dt) return null;
     const key = new Date(dt.getTime()+8*60*60*1000).toISOString().slice(0,10);
-    return cmpCrByDate[key] ?? null;
+    const users = cmpTsr2ByDate[key]||0;
+    const tickets = cmpTsr1ByDate[key]||0;
+    if(users===0 || tickets===0) return null;
+    return parseFloat(((tickets/users)*100).toFixed(2));
   }) : null;
 
-  console.log('[CR] 2025 cmpCrByDate entries:', Object.keys(cmpCrByDate).length);
-  console.log('[CR] s2 exists:', !!s2, 'compareYear:', compareYear);
-  console.log('[CR] cmpCrData non-null count:', cmpCrData ? cmpCrData.filter(v=>v!==null).length : 'N/A');
+  console.log('[CR] 2026 non-null:', crData.filter(v=>v!==null).length);
+  console.log('[CR] 2025 non-null:', cmpCrData ? cmpCrData.filter(v=>v!==null).length : 'N/A');
 
   // trim x-axis to first day with CR data in EITHER year
   const allCrData = crData.map((v,i)=>v ?? (cmpCrData?.[i] ?? null));
