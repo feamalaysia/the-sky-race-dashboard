@@ -1417,6 +1417,10 @@ function renderSRBody(brandKey){
   let totalTarget = 0;
   let targetAchieved = false;
   let saleEnded = false;
+  // get last phase end date from settings
+  const phasesWithEnd = (settings.phases||[]).filter(p=>p.end).sort((a,b)=>parseMYT(a.end)-parseMYT(b.end));
+  const lastPhaseEnd = phasesWithEnd.length ? parseMYT(phasesWithEnd[phasesWithEnd.length-1].end) : null;
+
   // compute daysLeftVal from last phase end regardless of targets
   let daysLeftVal = null;
   if(showSettings && lastPhaseEnd){
@@ -1426,9 +1430,6 @@ function renderSRBody(brandKey){
     const dLeft = Math.ceil((lastPhaseEnd - todayMYTQuick)/(1000*60*60*24));
     daysLeftVal = dLeft > 0 ? dLeft : 0;
   }
-  // get last phase end date from settings
-  const phasesWithEnd = (settings.phases||[]).filter(p=>p.end).sort((a,b)=>parseMYT(a.end)-parseMYT(b.end));
-  const lastPhaseEnd = phasesWithEnd.length ? parseMYT(phasesWithEnd[phasesWithEnd.length-1].end) : null;
 
   let shortBy = 0;
   if(showSettings && lastPhaseEnd){
